@@ -1,0 +1,50 @@
+[project]
+name = "finders"
+version = "0.1.0"
+description = "Financial Deep Research agent"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=1.0",
+    "langchain-community>=0.3",
+    "langchain-core>=1.0",
+    "langchain-text-splitters>=1.0",
+    "langchain-openai>=0.3",
+    "langchain-tavily>=0.1",
+    "langgraph>=1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "httpx>=0.28",
+    "beautifulsoup4>=4.12",
+    "rich>=13.0",
+    "fastapi>=0.115",
+    "sse-starlette>=2.0",
+    "uvicorn>=0.34",
+    "pyyaml>=6.0",
+    "watchdog>=6.0",
+    "markdownify>=0.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.9",
+]
+
+[project.scripts]
+finders = "finders.cli.main:main"
+finders-serve = "finders.cli.main:serve"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

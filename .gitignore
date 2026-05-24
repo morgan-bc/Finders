@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+build/
+dist/
+*.egg
+
+# User data directory
+.finds/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
