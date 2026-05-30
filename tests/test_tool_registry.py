@@ -25,7 +25,8 @@ def test_get_core_tools_basic():
     settings.memory.enabled = False
     with patch("finders.skills.registry.has_skills", return_value=False):
         tools = get_core_tools(settings)
-    assert len(tools) == 4
+    assert len(tools) == 5
     tool_names = [t.name for t in tools]
     assert "web_search" in tool_names
     assert "web_fetch" in tool_names
+    assert "task" in tool_names

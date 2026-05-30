@@ -6,8 +6,8 @@ from finders.utils.config import Settings
 from finders.agents.factory import create_finders_agent
 
 
-@patch.dict(os.environ, {"OPENAI_API_KEY": "test_key"})
-@patch("finders.agent.factory.create_agent")
+@patch.dict(os.environ, {"LLM_API_KEY": "test_key"})
+@patch("finders.agents.factory.create_agent")
 def test_create_agent_with_middleware(mock_create):
     mock_create.return_value = MagicMock()
     settings = Settings()
@@ -25,8 +25,8 @@ def test_create_agent_with_middleware(mock_create):
     assert len(call_kwargs["middleware"]) >= 5
 
 
-@patch.dict(os.environ, {"OPENAI_API_KEY": "test_key"})
-@patch("finders.agent.factory.create_agent")
+@patch.dict(os.environ, {"LLM_API_KEY": "test_key"})
+@patch("finders.agents.factory.create_agent")
 def test_create_agent_has_tools_and_prompt(mock_create):
     mock_create.return_value = MagicMock()
     settings = Settings()
@@ -38,4 +38,4 @@ def test_create_agent_has_tools_and_prompt(mock_create):
     call_kwargs = mock_create.call_args.kwargs
     assert "tools" in call_kwargs
     assert "system_prompt" in call_kwargs
-    assert "Dexter" in call_kwargs["system_prompt"]
+    assert "Finders" in call_kwargs["system_prompt"]
