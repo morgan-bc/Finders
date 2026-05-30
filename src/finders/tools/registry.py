@@ -4,6 +4,7 @@ from finders.utils.config import Settings
 from finders.tools.web_search import web_search
 from finders.tools.web_fetch import web_fetch
 from finders.tools.filesystem import read_file, write_file
+from finders.tools.task_tool import task_tool
 
 
 # 工具元数据：哪些工具可以安全并发
@@ -19,6 +20,7 @@ def get_core_tools(settings: Settings) -> list[BaseTool]:
         web_fetch,
         read_file,
         write_file,
+        task_tool,
     ]
 
     # Memory 工具（如果启用）
