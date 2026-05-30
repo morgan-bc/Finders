@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from finders.agent.factory import create_finders_agent
+from finders.agents.factory import create_finders_agent
 from finders.utils.callbacks import FindsCallbackHandler
 from finders.utils.config import Settings
 

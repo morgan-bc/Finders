@@ -1,14 +1,14 @@
 """Configuration models for finders."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Self
 
 
 class AgentConfig(BaseModel):
     """Agent 运行时配置。"""
 
-    model: str = Field(default="openai:gpt-5", description="LLM 模型")
-    fast_model: str = Field(default="openai:gpt-5-mini", description="快速模型（用于压缩等辅助任务）")
+    model: str = Field(default="deepseek-v4-flash", description="LLM 模型名称")
+    fast_model: str = Field(default="deepseek-v4-flash", description="快速模型（用于压缩等辅助任务）")
     max_iterations: int = Field(default=10, ge=1, le=50)
     compact_threshold: int = Field(default=100_000, description="触发压缩的 token 阈值")
     enable_todo: bool = Field(default=True, description="启用 TODO 任务清单（分解复杂任务）")
@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     # LLM
-    openai_api_key: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_api_base: Optional[str] = None
+    llm_model: Optional[str] = None
 
     # Search
     tavily_api_key: Optional[str] = None
@@ -53,6 +55,32 @@ class Settings(BaseSettings):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     tools: ToolConfig = Field(default_factory=ToolConfig)
+
+    @model_validator(mode="after")
+    def _apply_llm_config(self) -> Self:
+        """Apply LLM_MODEL env var to override default model name."""
+        if self.llm_model:
+            if self.agent.model == "deepseek-v4-flash":
+                self.agent.model = self.llm_model
+            if self.agent.fast_model == "deepseek-v4-flash":
+                self.agent.fast_model = self.llm_model
+        return self
+
+    def create_chat_model(self, model_name: str | None = None, fast: bool = False):
+        """Create a ChatOpenAI model instance using LLM_API_KEY and LLM_API_BASE.
+
+        Args:
+            model_name: Override model name. If None, uses agent.model (or agent.fast_model if fast=True).
+            fast: If True and model_name is None, use agent.fast_model.
+        """
+        from langchain_openai import ChatOpenAI
+
+        model = model_name or (self.agent.fast_model if fast else self.agent.model)
+        return ChatOpenAI(
+            model=model,
+            api_key=self.llm_api_key,
+            base_url=self.llm_api_base,
+        )
 
 
 def get_settings() -> Settings:

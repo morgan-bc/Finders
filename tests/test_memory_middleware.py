@@ -3,7 +3,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
-from finders.middleware.memory import MemoryMiddleware
+from finders.middlewares.memory import MemoryMiddleware
 
 
 def test_memory_middleware_init():

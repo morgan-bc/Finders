@@ -1,6 +1,6 @@
 """Tests for finders system prompt builder."""
 from unittest.mock import patch
-from finders.prompts.system import build_system_prompt
+from finders.agents.prompt import build_system_prompt, SYSTEM_PROMPT_TEMPLATE
 from finders.utils.config import Settings
 
 
@@ -31,9 +31,7 @@ def test_build_system_prompt_contains_behavior():
     assert "TODO" in prompt
 
 
-def test_build_system_prompt_template_not_found():
-    """Test that template file is loaded without error."""
-    from finders.prompts.system import _load_template
-    template = _load_template()
-    assert "{{date}}" in template
-    assert "{{tool_descriptions}}" in template
+def test_system_prompt_template_structure():
+    """Test that template contains expected placeholders."""
+    assert "{{date}}" in SYSTEM_PROMPT_TEMPLATE
+    assert "{{tool_descriptions}}" in SYSTEM_PROMPT_TEMPLATE

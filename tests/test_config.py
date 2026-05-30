@@ -4,8 +4,8 @@ from finders.utils.config import Settings, AgentConfig, MemoryConfig, ToolConfig
 
 
 def test_default_settings():
-    settings = Settings()
-    assert settings.agent.model == "openai:gpt-5"
+    settings = Settings(_env_file=None)
+    assert settings.agent.model == "deepseek-v4-flash"
     assert settings.agent.max_iterations == 10
     assert settings.memory.enabled is True
     assert settings.memory.mmr_lambda == 0.7

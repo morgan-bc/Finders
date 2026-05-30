@@ -9,7 +9,7 @@ from rich.live import Live
 from rich.spinner import Spinner
 from rich.table import Table
 
-from finders.agent.runner import AgentRunner
+from finders.agents.runner import AgentRunner
 
 
 class TUI:

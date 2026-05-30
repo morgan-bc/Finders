@@ -1,6 +1,6 @@
 """Tests for finders agent scratchpad."""
 import pytest
-from finders.agent.scratchpad import Scratchpad
+from finders.agents.scratchpad import Scratchpad
 
 
 def test_scratchpad_initial():

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 
-from finders.agent.runner import AgentEvent
+from finders.agents.runner import AgentEvent
 
 
 async def agent_event_stream(runner: AgentEvent) -> AsyncIterator[dict]:

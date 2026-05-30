@@ -107,14 +107,14 @@ def test_settings_load_from_env():
     from finders.utils.config import Settings, get_settings
 
     # Direct instantiation with env override
-    settings = Settings(openai_api_key="test_key_123")
-    assert settings.openai_api_key == "test_key_123"
+    settings = Settings(llm_api_key="test_key_123")
+    assert settings.llm_api_key == "test_key_123"
 
 
 def test_prompt_tool_injection(tmp_path):
     """测试 system prompt 正确注入工具描述。"""
     from finders.utils.config import Settings
-    from finders.prompts.system import build_system_prompt
+    from finders.agents.prompt import build_system_prompt
 
     settings = Settings()
     settings.memory.enabled = False

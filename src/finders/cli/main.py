@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from finders.agent.runner import AgentRunner
+from finders.agents.runner import AgentRunner
 from finders.cli.tui import TUI
 from finders.utils.config import get_settings
 

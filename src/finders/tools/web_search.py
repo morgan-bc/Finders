@@ -19,10 +19,11 @@ def format_search_results(results: list[dict]) -> str:
 async def web_search(query: str) -> str:
     """Search the web for current information on any topic. Returns relevant search results with URLs and content snippets."""
     try:
-        from langchain_tavily import TavilySearchResults
+        from langchain_tavily import TavilySearch
 
-        search_tool = TavilySearchResults(max_results=5)
-        results = await search_tool.ainvoke({"query": query})
+        search_tool = TavilySearch(max_results=5)
+        response = await search_tool.ainvoke({"query": query})
+        results = response.get("results", [])
         return format_search_results(results)
     except ImportError:
         return "Error: Tavily Search not available. Install langchain-tavily."

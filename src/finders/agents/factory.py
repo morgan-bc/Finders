@@ -1,4 +1,4 @@
-"""Agent factory for creating Finds agent with middleware pipeline."""
+"""Agent factory for creating Finders agent with middleware pipeline."""
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     SummarizationMiddleware,
@@ -12,12 +12,15 @@ from langchain.agents.middleware import (
 )
 from finders.utils.config import Settings
 from finders.tools.registry import get_core_tools
-from finders.prompts.system import build_system_prompt
+from finders.agents.prompt import build_system_prompt
 from finders.utils.paths import get_finders_dir
 
 
 def create_finders_agent(settings: Settings):
-    """创建 Finds Agent 实例。"""
+    """创建 Finders Agent 实例。"""
+
+    model = settings.create_chat_model()
+    fast_model = settings.create_chat_model(fast=True)
 
     system_prompt = build_system_prompt(settings)
     tools = get_core_tools(settings)
@@ -27,7 +30,7 @@ def create_finders_agent(settings: Settings):
         TodoListMiddleware(),
         # 2. 上下文压缩：当上下文超过阈值时，用快模型压缩旧消息
         SummarizationMiddleware(
-            model=settings.agent.fast_model,
+            model=fast_model,
             trigger=("tokens", settings.agent.compact_threshold),
         ),
         # 3. 上下文编辑：无条件截断超出 token 限制的消息
@@ -52,7 +55,7 @@ def create_finders_agent(settings: Settings):
 
     # 8. Memory flush + recall（如果启用记忆系统）
     if settings.memory.enabled:
-        from finders.middleware.memory import MemoryMiddleware
+        from finders.middlewares.memory import MemoryMiddleware
         middleware.append(
             MemoryMiddleware(
                 memory_dir=str(get_finders_dir()),
@@ -61,7 +64,7 @@ def create_finders_agent(settings: Settings):
         )
 
     return create_agent(
-        model=settings.agent.model,
+        model=model,
         tools=tools,
         system_prompt=system_prompt,
         middleware=middleware,

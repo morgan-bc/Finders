@@ -3,7 +3,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 from finders.utils.config import Settings
-from finders.agent.factory import create_finders_agent
+from finders.agents.factory import create_finders_agent
 
 
 @patch.dict(os.environ, {"OPENAI_API_KEY": "test_key"})

@@ -7,7 +7,7 @@ from fastapi import APIRouter
 
 from finders.api.models import HealthResponse, QueryRequest
 from finders.api.sse import agent_event_stream
-from finders.agent.runner import AgentRunner
+from finders.agents.runner import AgentRunner
 from finders.utils.config import get_settings, Settings
 
 router = APIRouter(prefix="/api")
