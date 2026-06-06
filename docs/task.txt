@@ -1,0 +1,13 @@
+参考 deerflow 实现一个本地的虚拟沙箱 LocalSandBox, 实现文件系统，工具包括
+- read_file() 读取文件
+- write_file() 创建新文件
+- edit_file() 字符串替换编辑
+- list_dir() 列出目录文件
+- glob() 文件模式匹配
+- grep() 文本搜索
+- execute() 沙箱命令执行
+
+参考代码 D:\Github\deer-flow\backend\packages\harness\deerflow\sandbox\local\local_sandbox.py
+要求实现文件安全，读写文件只能在 .env 指定的 workspace 中
+
+完成后替换当前的文件工具。创建 Finders agent 加载文件工具

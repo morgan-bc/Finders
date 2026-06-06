@@ -3,14 +3,22 @@ from langchain_core.tools import BaseTool
 from finders.utils.config import Settings
 from finders.tools.web_search import web_search
 from finders.tools.web_fetch import web_fetch
-from finders.tools.filesystem import read_file, write_file
+from finders.tools.filesystem import (
+    read_file,
+    write_file,
+    edit_file,
+    list_dir,
+    glob,
+    grep,
+    execute,
+)
 from finders.tools.task_tool import task_tool
 
 
 # 工具元数据：哪些工具可以安全并发
-CONCURRENT_TOOLS = {"web_search", "web_fetch", "read_file"}
+CONCURRENT_TOOLS = {"web_search", "web_fetch", "read_file", "list_dir", "glob", "grep"}
 # 哪些工具需要用户审批
-APPROVAL_TOOLS = {"write_file"}
+APPROVAL_TOOLS = {"write_file", "edit_file", "execute"}
 
 
 def get_core_tools(settings: Settings) -> list[BaseTool]:
@@ -20,6 +28,11 @@ def get_core_tools(settings: Settings) -> list[BaseTool]:
         web_fetch,
         read_file,
         write_file,
+        edit_file,
+        list_dir,
+        glob,
+        grep,
+        execute,
         task_tool,
     ]
 

@@ -38,7 +38,7 @@ def _build_middleware(settings: Settings):
             max_retries=3,
         ),
         HumanInTheLoopMiddleware(
-            interrupt_on={"write_file": True},
+            interrupt_on={"write_file": True, "edit_file": True},
         ),
     ]
 

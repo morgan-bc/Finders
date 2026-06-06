@@ -1,6 +1,7 @@
 """Configuration models for finders."""
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings
+from pathlib import Path
 from typing import Optional, Self
 
 
@@ -51,6 +52,9 @@ class Settings(BaseSettings):
     # Financial Data
     financial_datasets_api_key: Optional[str] = None
 
+    # Workspace
+    finders_workspace: Optional[str] = None
+
     # Sub-configs
     agent: AgentConfig = Field(default_factory=AgentConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
@@ -65,6 +69,16 @@ class Settings(BaseSettings):
             if self.agent.fast_model == "deepseek-v4-flash":
                 self.agent.fast_model = self.llm_model
         return self
+
+    def get_workspace_path(self) -> Path:
+        """Get the sandbox workspace path.
+
+        Uses FINDERS_WORKSPACE env var if set, otherwise defaults to
+        ~/.finders/workspace.
+        """
+        if self.finders_workspace:
+            return Path(self.finders_workspace).expanduser().resolve()
+        return Path.home() / ".finders" / "workspace"
 
     def create_chat_model(self, model_name: str | None = None, fast: bool = False):
         """Create a ChatOpenAI model instance using LLM_API_KEY and LLM_API_BASE.
