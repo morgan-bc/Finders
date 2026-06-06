@@ -41,12 +41,6 @@ def get_core_tools(settings: Settings) -> list[BaseTool]:
         from finders.memory.search_tool import memory_search_tool
         tools.append(memory_search_tool)
 
-    # Skill 工具（如果有可用 skills）
-    from finders.skills.registry import has_skills
-    if has_skills():
-        from finders.tools.skill import skill_tool
-        tools.append(skill_tool)
-
     return tools
 
 

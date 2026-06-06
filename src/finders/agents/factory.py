@@ -1,4 +1,6 @@
 """Agent factory for creating Finders agent with middleware pipeline."""
+from pathlib import Path
+
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     SummarizationMiddleware,
@@ -14,6 +16,7 @@ from finders.utils.config import Settings
 from finders.tools.registry import get_core_tools
 from finders.agents.prompt import build_system_prompt
 from finders.utils.paths import get_finders_dir
+from finders.skills.middleware import SkillsMiddleware
 
 
 def _build_middleware(settings: Settings):
@@ -22,6 +25,10 @@ def _build_middleware(settings: Settings):
     fast_model = settings.create_chat_model(fast=True)
 
     return [
+        SkillsMiddleware(
+            skills_dir=Path.home() / ".finders" / "skills",
+            project_skills_dir=Path.cwd() / ".finders" / "skills",
+        ),
         TodoListMiddleware(),
         SummarizationMiddleware(
             model=fast_model,

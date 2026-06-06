@@ -27,13 +27,12 @@ def test_create_agent_with_middleware(mock_create):
 
 @patch.dict(os.environ, {"LLM_API_KEY": "test_key"})
 @patch("finders.agents.factory.create_agent")
-def test_create_agent_has_tools_and_prompt(mock_create):
+def test_create_agent_have_tools_and_prompt(mock_create):
     mock_create.return_value = MagicMock()
     settings = Settings()
     settings.memory.enabled = False
 
-    with patch("finders.skills.registry.has_skills", return_value=False):
-        agent = create_finders_agent(settings)
+    agent = create_finders_agent(settings)
 
     call_kwargs = mock_create.call_args.kwargs
     assert "tools" in call_kwargs

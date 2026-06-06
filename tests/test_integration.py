@@ -1,4 +1,4 @@
-"""Full pipeline integration test: config -> factory -> tools -> memory -> skills."""
+"""Full pipeline integration test: config -> factory -> tools -> memory."""
 import os
 import tempfile
 from pathlib import Path
@@ -10,15 +10,12 @@ def test_full_pipeline_no_llm(tmp_path):
     from finders.utils.config import Settings
     from finders.tools.registry import get_core_tools, is_concurrent_safe, requires_approval
     from finders.memory.store import MemoryStore
-    from finders.skills.registry import has_skills, reset_cache
 
     settings = Settings()
     settings.memory.enabled = False
 
     # 1. Tools
-    reset_cache()
-    with patch("finders.skills.registry.has_skills", return_value=False):
-        tools = get_core_tools(settings)
+    tools = get_core_tools(settings)
     assert len(tools) >= 4
 
     # 2. Concurrency metadata
@@ -34,10 +31,6 @@ def test_full_pipeline_no_llm(tmp_path):
     store = MemoryStore(base_dir=tmp_path)
     store.write_memory_file("MEMORY.md", "Test memory")
     assert store.read_memory_file("MEMORY.md") == "Test memory"
-
-    # 5. Skills (should be empty by default)
-    reset_cache()
-    assert isinstance(has_skills(), bool)
 
 
 def test_memory_pipeline(tmp_path):
@@ -65,43 +58,6 @@ def test_memory_pipeline(tmp_path):
     database.close()
 
 
-def test_skill_pipeline(tmp_path):
-    """测试 skill load -> registry -> tool pipeline."""
-    import tempfile
-    from finders.skills.loader import load_skill
-    from finders.skills.registry import get_skill, discover_skills, reset_cache
-
-    # Create a test skill
-    skill_dir = tmp_path / "test_skill"
-    skill_dir.mkdir()
-    skill_file = skill_dir / "SKILL.md"
-    skill_file.write_text("""---
-name: test-analysis
-description: Test analysis skill
----
-
-# Test Analysis
-Follow these steps...
-""", encoding="utf-8")
-
-    # Load directly
-    skill = load_skill(skill_file)
-    assert skill is not None
-    assert skill.name == "test-analysis"
-
-    # Registry should discover it if we point to the right dir
-    reset_cache()
-    from finders.skills import registry as reg
-    original_dirs = reg.SKILL_DIRS
-    reg.SKILL_DIRS = [skill_dir.parent]
-
-    discovered = reg.discover_skills()
-    assert len(discovered) >= 1
-
-    # Restore
-    reg.SKILL_DIRS = original_dirs
-
-
 def test_settings_load_from_env():
     """测试配置从环境变量加载。"""
     from finders.utils.config import Settings, get_settings
@@ -118,8 +74,7 @@ def test_prompt_tool_injection(tmp_path):
 
     settings = Settings()
     settings.memory.enabled = False
-    with patch("finders.skills.registry.has_skills", return_value=False):
-        prompt = build_system_prompt(settings)
+    prompt = build_system_prompt(settings)
 
     # Should contain all core tools
     assert "web_search" in prompt

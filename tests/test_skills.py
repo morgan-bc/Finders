@@ -1,12 +1,13 @@
 """Tests for finders skills system."""
 from pathlib import Path
 import tempfile
-from finders.skills.loader import load_skill
-from finders.skills.registry import discover_skills, get_skill, has_skills, reset_cache
+from finders.skills.load import list_skills, _parse_skill_metadata, SkillMetadata
 
 
-def test_load_skill(tmp_path):
-    skill_file = tmp_path / "SKILL.md"
+def test_parse_skill_metadata(tmp_path):
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
     skill_file.write_text("""---
 name: test-skill
 description: A test skill
@@ -16,36 +17,109 @@ description: A test skill
 Do something useful.
 """, encoding="utf-8")
 
-    result = load_skill(skill_file)
+    result = _parse_skill_metadata(skill_file, source="user")
     assert result is not None
-    assert result.name == "test-skill"
-    assert "Do something useful" in result.instructions
+    assert result["name"] == "test-skill"
+    assert result["description"] == "A test skill"
+    assert result["source"] == "user"
 
 
-def test_load_skill_invalid(tmp_path):
-    skill_file = tmp_path / "SKILL.md"
-    skill_file.write_text("No yaml frontmatter", encoding="utf-8")
-    assert load_skill(skill_file) is None
-
-
-def test_load_skill_missing_fields(tmp_path):
-    skill_file = tmp_path / "SKILL.md"
+def test_parse_skill_metadata_missing_fields(tmp_path):
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
     skill_file.write_text("---\nname: test\n---\nInstructions", encoding="utf-8")
-    assert load_skill(skill_file) is None  # missing description
+    assert _parse_skill_metadata(skill_file, source="user") is None
 
 
-def test_discover_skills_empty():
-    reset_cache()
-    skills = discover_skills()
+def test_parse_skill_metadata_no_frontmatter(tmp_path):
+    skill_dir = tmp_path / "test-skill"
+    skill_dir.mkdir()
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text("No yaml frontmatter", encoding="utf-8")
+    assert _parse_skill_metadata(skill_file, source="user") is None
+
+
+def test_list_skills_empty(tmp_path):
+    skills = list_skills(user_skills_dir=tmp_path / "nonexistent")
     assert isinstance(skills, list)
+    assert len(skills) == 0
 
 
-def test_get_skill_not_found():
-    reset_cache()
-    assert get_skill("nonexistent_skill_xyz") is None
+def test_list_skills_user(tmp_path):
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    skill_dir = skills_dir / "test-skill"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("""---
+name: test-skill
+description: A test skill
+---
+
+Instructions here.
+""", encoding="utf-8")
+
+    skills = list_skills(user_skills_dir=skills_dir)
+    assert len(skills) == 1
+    assert skills[0]["name"] == "test-skill"
+    assert skills[0]["source"] == "user"
 
 
-def test_has_skills():
-    reset_cache()
-    result = has_skills()
-    assert isinstance(result, bool)
+def test_list_skills_project_overrides_user(tmp_path):
+    user_dir = tmp_path / "user_skills"
+    project_dir = tmp_path / "project_skills"
+    user_dir.mkdir()
+    project_dir.mkdir()
+
+    # User skill
+    (user_dir / "test-skill").mkdir()
+    (user_dir / "test-skill" / "SKILL.md").write_text("""---
+name: test-skill
+description: User skill
+---
+
+User instructions.
+""", encoding="utf-8")
+
+    # Project skill with same name
+    (project_dir / "test-skill").mkdir()
+    (project_dir / "test-skill" / "SKILL.md").write_text("""---
+name: test-skill
+description: Project skill
+---
+
+Project instructions.
+""", encoding="utf-8")
+
+    skills = list_skills(user_skills_dir=user_dir, project_skills_dir=project_dir)
+    assert len(skills) == 1
+    assert skills[0]["source"] == "project"
+    assert skills[0]["description"] == "Project skill"
+
+
+def test_list_skills_multiple(tmp_path):
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+
+    (skills_dir / "skill-a").mkdir()
+    (skills_dir / "skill-a" / "SKILL.md").write_text("""---
+name: skill-a
+description: Skill A
+---
+
+Instructions A.
+""", encoding="utf-8")
+
+    (skills_dir / "skill-b").mkdir()
+    (skills_dir / "skill-b" / "SKILL.md").write_text("""---
+name: skill-b
+description: Skill B
+---
+
+Instructions B.
+""", encoding="utf-8")
+
+    skills = list_skills(user_skills_dir=skills_dir)
+    assert len(skills) == 2
+    names = {s["name"] for s in skills}
+    assert names == {"skill-a", "skill-b"}

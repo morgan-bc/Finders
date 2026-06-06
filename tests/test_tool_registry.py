@@ -29,8 +29,7 @@ def test_approval_tools():
 def test_get_core_tools_basic():
     settings = Settings()
     settings.memory.enabled = False
-    with patch("finders.skills.registry.has_skills", return_value=False):
-        tools = get_core_tools(settings)
+    tools = get_core_tools(settings)
     assert len(tools) == 10
     tool_names = [t.name for t in tools]
     assert "web_search" in tool_names

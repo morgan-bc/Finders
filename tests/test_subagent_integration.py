@@ -16,8 +16,7 @@ def test_subagent_executor_initialization():
     settings = Settings()
     settings.memory.enabled = False
     
-    with patch("finders.skills.registry.has_skills", return_value=False):
-        tools = get_core_tools(settings)
+    tools = get_core_tools(settings)
     
     config = SubagentConfig(
         name="test",
