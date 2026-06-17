@@ -57,8 +57,8 @@ The report should include:
 - **Conclusions** — Final recommendations or observations
 
 ### 2.3 Chart Placeholders
-- Use `@import "chart_name.png"` placeholders in the content where charts should appear
-- Example: `@import "revenue_trend.png"`
+- Use standard markdown image syntax `![chart description](images/chart_name.png)` where charts should appear
+- Example: `![Revenue Trend](images/revenue_trend.png)`
 - Support multiple target languages (Chinese/English) based on user preference
 
 ### 2.4 Source Citation
@@ -69,7 +69,7 @@ The report should include:
 ## Phase 3: Chart Generation (Optional)
 
 ### 3.1 Parse Chart Requirements
-- Identify all `@import` placeholders from the drafted report
+- Identify all markdown image references from the drafted report
 - For each chart, determine: chart type, data to visualize, title, and axes
 
 ### 3.2 Iterative Code → Execute → Critique Cycle
@@ -121,7 +121,7 @@ The final deliverable is a markdown report with:
 
 [Detailed analysis with data points and insights...]
 
-@import "images/chart_name.png"
+![Chart Title](images/chart_name.png)
 
 *Chart description (< 100 words)*
 
@@ -138,6 +138,6 @@ The final deliverable is a markdown report with:
 *Data as of: [Date]*
 ```
 
-- Charts embedded via `@import` placeholders are replaced with actual image paths
+- Charts embedded via markdown image syntax `![...](images/...)` with actual image paths
 - Each chart is accompanied by a brief description/caption
 - Inline citations `[1]`, `[2]` reference the sources section at the bottom
