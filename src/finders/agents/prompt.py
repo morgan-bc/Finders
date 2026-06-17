@@ -61,7 +61,7 @@ TODO_GUIDANCE = """\
 TOOLS_SECTION = """\
 ## Available Tools
 
-{tool_descriptions}
+You have access to a set of tools for web search, web content retrieval, file operations, task delegation, and memory recall. Tool descriptions and schemas are provided separately.
 
 ### Tool Usage Guidelines
 
@@ -71,6 +71,35 @@ TOOLS_SECTION = """\
 - **Local file access**: Use `read_file`, `list_dir`, `glob`, and `grep` to work with local files in your workspace
 - **Task delegation**: Use `task_tool` to delegate independent subtasks that can run in parallel
 - **Memory recall**: Use `memory_search` to search past research and context (when memory is enabled)"""
+
+SKILLS_SECTION = """\
+## Skills System
+
+You have access to a skills library that provides specialized capabilities and domain knowledge.
+
+**Available Skills:**
+
+{skills_list}
+
+**How to Use Skills (Progressive Disclosure):**
+
+Skills follow a **progressive disclosure** pattern - you know they exist (name + description above), but you only read the full instructions when needed:
+
+1. **Recognize when a skill applies**: Check if the user's task matches any skill's description
+2. **Read the skill's full instructions**: Use the `read_file` tool to read the SKILL.md file at the path shown above
+3. **Follow the skill's instructions**: SKILL.md contains step-by-step workflows, best practices, and examples
+4. **Access supporting files**: Skills may include Python scripts, configs, or reference docs - use absolute paths
+
+**When to Use Skills:**
+- When the user's request matches a skill's domain (e.g., "research X" → web-research skill)
+- When you need specialized knowledge or structured workflows
+- When a skill provides proven patterns for complex tasks
+
+**Skills are Self-Documenting:**
+- Each SKILL.md tells you exactly what the skill does and how to use it
+- The skill list above shows the full path for each skill's SKILL.md file
+
+Remember: Skills are tools to make you more capable and consistent. When in doubt, check if a skill exists for the task!"""
 
 OUTPUT_FORMAT_SECTION = """\
 ## Response Format
@@ -112,25 +141,30 @@ SYSTEM_PROMPT_TEMPLATE = """{identity}
 
 {output_format}
 
+{skills}
+
 {date}
 """
 
 
-def build_system_prompt(settings: Settings) -> str:
+def build_system_prompt(
+    settings: Settings,
+    skills_list: str = "(No skills available. You can develop custom skills at ~/.finders/skills/)",
+) -> str:
     """Build the complete system prompt for the Finders agent.
 
     Assembles modular sections into a structured system prompt, including
-    identity, core principles, workflow guidance, tool descriptions,
-    output format guidelines, and dynamic date at the end.
+    identity, core principles, workflow guidance, tool usage guidelines,
+    output format guidelines, skills system, and dynamic date at the end.
 
     Args:
         settings: Application settings containing configuration values.
+        skills_list: Formatted skills list string, injected by SkillsMiddleware.
 
     Returns:
         A fully formatted system prompt string.
     """
     date_str = datetime.now().strftime("%A, %B %d, %Y")
-    tool_descriptions = _build_tool_descriptions(settings)
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         identity=IDENTITY_SECTION,
@@ -138,6 +172,7 @@ def build_system_prompt(settings: Settings) -> str:
         core_principles=BEHAVIOR_SECTION,
         workflow=WORKFLOW_SECTION,
         task_management=TODO_GUIDANCE,
-        tools=TOOLS_SECTION.format(tool_descriptions=tool_descriptions),
+        tools=TOOLS_SECTION,
         output_format=OUTPUT_FORMAT_SECTION,
+        skills=SKILLS_SECTION.format(skills_list=skills_list),
     )
