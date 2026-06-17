@@ -102,8 +102,6 @@ def _build_tool_descriptions(settings: Settings) -> str:
 
 SYSTEM_PROMPT_TEMPLATE = """{identity}
 
-{date}
-
 {core_principles}
 
 {workflow}
@@ -113,6 +111,8 @@ SYSTEM_PROMPT_TEMPLATE = """{identity}
 {tools}
 
 {output_format}
+
+{date}
 """
 
 
@@ -120,8 +120,8 @@ def build_system_prompt(settings: Settings) -> str:
     """Build the complete system prompt for the Finders agent.
 
     Assembles modular sections into a structured system prompt, including
-    identity, date, core principles, workflow guidance, tool descriptions,
-    and output format guidelines.
+    identity, core principles, workflow guidance, tool descriptions,
+    output format guidelines, and dynamic date at the end.
 
     Args:
         settings: Application settings containing configuration values.
