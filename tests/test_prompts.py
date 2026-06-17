@@ -8,7 +8,6 @@ from finders.agents.prompt import (
     WORKFLOW_SECTION,
     TODO_GUIDANCE,
     TOOLS_SECTION,
-    OUTPUT_FORMAT_SECTION,
 )
 from finders.utils.config import Settings
 
@@ -47,7 +46,6 @@ def test_system_prompt_template_structure():
     assert "{workflow}" in SYSTEM_PROMPT_TEMPLATE
     assert "{task_management}" in SYSTEM_PROMPT_TEMPLATE
     assert "{tools}" in SYSTEM_PROMPT_TEMPLATE
-    assert "{output_format}" in SYSTEM_PROMPT_TEMPLATE
 
 
 def test_prompt_contains_all_sections():
@@ -62,6 +60,17 @@ def test_prompt_contains_all_sections():
     assert "Research Workflow" in prompt
     assert "Task Management" in prompt
     assert "Available Tools" in prompt
-    assert "Response Format" in prompt
     assert "Evidence-driven" in prompt
-    assert "Executive Summary" in prompt
+
+
+def test_prompt_does_not_contain_output_format_or_skills():
+    """Test that system prompt does NOT contain OUTPUT_FORMAT or Skills System sections.
+    These are handled separately: output format guidance is in workflow, skills via middleware.
+    """
+    settings = Settings()
+    settings.memory.enabled = False
+    prompt = build_system_prompt(settings)
+
+    assert "## Response Format" not in prompt
+    assert "## Skills System" not in prompt
+    assert "Progressive Disclosure" not in prompt

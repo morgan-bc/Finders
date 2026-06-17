@@ -1,6 +1,5 @@
 """System prompt builder for Finders agent."""
 from datetime import datetime
-from pathlib import Path
 from finders.utils.config import Settings
 
 
@@ -46,7 +45,7 @@ When tackling a complex research question, follow this structured approach:
    - Cross-reference multiple sources to verify key claims
    - Identify and resolve conflicting information
    - Update your TODO list as tasks are completed
-5. **Deliver the Answer**: Structure your response following the output format guidelines below.
+5. **Deliver the Answer**: Structure your response clearly, starting with the direct answer, then supporting evidence and citations.
 
 **Dynamic Planning**: If you discover new avenues of research during your investigation, add them to your TODO list. If initial searches are insufficient, adjust your strategy and try different search terms or sources."""
 
@@ -72,62 +71,6 @@ You have access to a set of tools for web search, web content retrieval, file op
 - **Task delegation**: Use `task_tool` to delegate independent subtasks that can run in parallel
 - **Memory recall**: Use `memory_search` to search past research and context (when memory is enabled)"""
 
-SKILLS_SECTION = """\
-## Skills System
-
-You have access to a skills library that provides specialized capabilities and domain knowledge.
-
-**Available Skills:**
-
-{skills_list}
-
-**How to Use Skills (Progressive Disclosure):**
-
-Skills follow a **progressive disclosure** pattern - you know they exist (name + description above), but you only read the full instructions when needed:
-
-1. **Recognize when a skill applies**: Check if the user's task matches any skill's description
-2. **Read the skill's full instructions**: Use the `read_file` tool to read the SKILL.md file at the path shown above
-3. **Follow the skill's instructions**: SKILL.md contains step-by-step workflows, best practices, and examples
-4. **Access supporting files**: Skills may include Python scripts, configs, or reference docs - use absolute paths
-
-**When to Use Skills:**
-- When the user's request matches a skill's domain (e.g., "research X" → web-research skill)
-- When you need specialized knowledge or structured workflows
-- When a skill provides proven patterns for complex tasks
-
-**Skills are Self-Documenting:**
-- Each SKILL.md tells you exactly what the skill does and how to use it
-- The skill list above shows the full path for each skill's SKILL.md file
-
-Remember: Skills are tools to make you more capable and consistent. When in doubt, check if a skill exists for the task!"""
-
-OUTPUT_FORMAT_SECTION = """\
-## Response Format
-
-Structure your final response as follows:
-
-1. **Executive Summary**: Start with a clear, direct answer to the user's question
-2. **Detailed Analysis**: Support your answer with data, evidence, and citations
-   - Use bullet points, tables, or numbered lists for clarity
-   - Include relevant statistics, dates, and figures
-3. **Sources**: Cite all sources with URLs inline (e.g., [Source Name](https://...))
-4. **Caveats**: Note any limitations, uncertainties, or areas needing further research
-
-When data is unavailable for a specific aspect, state that clearly rather than speculating."""
-
-
-def _build_tool_descriptions(settings: Settings) -> str:
-    """Build formatted tool descriptions with usage hints."""
-    from finders.tools.registry import get_core_tools
-
-    tools = get_core_tools(settings)
-    lines = []
-    for t in tools:
-        desc = t.description or "No description available."
-        # Take only the first line of description for brevity
-        lines.append(f"- **{t.name}**: {desc.split(chr(10))[0]}")
-    return "\n".join(lines)
-
 
 SYSTEM_PROMPT_TEMPLATE = """{identity}
 
@@ -139,27 +82,21 @@ SYSTEM_PROMPT_TEMPLATE = """{identity}
 
 {tools}
 
-{output_format}
-
-{skills}
-
 {date}
 """
 
 
-def build_system_prompt(
-    settings: Settings,
-    skills_list: str = "(No skills available. You can develop custom skills at ~/.finders/skills/)",
-) -> str:
+def build_system_prompt(settings: Settings) -> str:
     """Build the complete system prompt for the Finders agent.
 
     Assembles modular sections into a structured system prompt, including
     identity, core principles, workflow guidance, tool usage guidelines,
-    output format guidelines, skills system, and dynamic date at the end.
+    and dynamic date at the end.
+
+    Skills are injected separately by SkillsMiddleware via `before_model`.
 
     Args:
         settings: Application settings containing configuration values.
-        skills_list: Formatted skills list string, injected by SkillsMiddleware.
 
     Returns:
         A fully formatted system prompt string.
@@ -173,6 +110,4 @@ def build_system_prompt(
         workflow=WORKFLOW_SECTION,
         task_management=TODO_GUIDANCE,
         tools=TOOLS_SECTION,
-        output_format=OUTPUT_FORMAT_SECTION,
-        skills=SKILLS_SECTION.format(skills_list=skills_list),
     )
