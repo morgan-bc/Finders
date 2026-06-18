@@ -11,11 +11,11 @@ from langchain_core.messages import SystemMessage
 
 
 CURRENT_DATE_PROMPT = """
-## Current Date
+## System reminder
 
-Today is **{date}**.
+Current Date: {date}
 
-**Temporal Awareness**: Always use this actual date when forming search queries, referencing time-sensitive information, or generating reports. Never use hardcoded past years or placeholder dates.
+Always use this actual date when forming search queries, referencing time-sensitive information, or generating reports. Never use hardcoded past years or placeholder dates.
 """
 
 
@@ -42,7 +42,7 @@ class DynamicContextMiddleware(AgentMiddleware):
         messages = list(state.get("messages", []))
         if messages and isinstance(messages[0], SystemMessage):
             original_content = messages[0].content
-            if isinstance(original_content, str) and "## Current Date" not in original_content:
+            if isinstance(original_content, str) and "## System reminder" not in original_content:
                 messages[0] = SystemMessage(content=original_content + "\n\n" + date_section)
                 return {"messages": messages}
 
