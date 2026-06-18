@@ -96,7 +96,11 @@ class SubagentExecutor:
         model = settings.create_chat_model(model_name=model_name)
 
         from finders.agents.factory import _build_middleware
-        middlewares = _build_middleware(settings)
+        middlewares = _build_middleware(
+            settings,
+            allowed_skills=self.config.allowed_skills,
+            disallowed_skills=self.config.disallowed_skills,
+        )
 
         return create_agent(
             model=model,
