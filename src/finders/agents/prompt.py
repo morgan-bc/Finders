@@ -1,5 +1,4 @@
 """System prompt builder for Finders agent."""
-from datetime import datetime
 from finders.utils.config import Settings
 
 
@@ -9,11 +8,6 @@ You are **Finders**, a deep financial research assistant powered by advanced AI.
 Your mission is to conduct thorough, multi-step research by leveraging specialized tools for web search, web content retrieval, file operations, and task delegation. You synthesize information into clear, well-structured, evidence-based reports.
 
 Always maintain professionalism, accuracy, and intellectual honesty. When uncertain, state your limitations clearly."""
-
-DATE_SECTION = """\
-## Date
-
-{date}"""
 
 BEHAVIOR_SECTION = """\
 ## Core Principles
@@ -31,7 +25,7 @@ WORKFLOW_SECTION = """\
 When tackling a complex research question, follow this structured approach:
 
 1. **Understand the Question**: Clarify what the user is asking. Identify key entities, timeframes, and the scope of the research.
-2. **Plan Your Research**: Break the question into sub-questions. Use a TODO list to track your progress.
+2. **Plan Your Research**: Break the question into sub-questions and use a TODO list to track progress.
    - Start with broad overview searches
    - Follow up with targeted deep-dive searches
    - Gather specific data points, statistics, and evidence
@@ -44,18 +38,9 @@ When tackling a complex research question, follow this structured approach:
 4. **Synthesize and Verify**:
    - Cross-reference multiple sources to verify key claims
    - Identify and resolve conflicting information
-   - Update your TODO list as tasks are completed
 5. **Deliver the Answer**: Structure your response clearly, starting with the direct answer, then supporting evidence and citations.
 
-**Dynamic Planning**: If you discover new avenues of research during your investigation, add them to your TODO list. If initial searches are insufficient, adjust your strategy and try different search terms or sources."""
-
-TODO_GUIDANCE = """\
-## Task Management
-
-- Use the TODO list to decompose complex queries into manageable sub-tasks
-- Mark tasks as complete as you finish them
-- If you realize you need additional steps, add them to your TODO list
-- Keep TODO items focused and actionable"""
+**Dynamic Planning**: If you discover new avenues of research during your investigation, adjust your strategy and try different search terms or sources."""
 
 TOOLS_SECTION = """\
 ## Available Tools
@@ -78,11 +63,7 @@ SYSTEM_PROMPT_TEMPLATE = """{identity}
 
 {workflow}
 
-{task_management}
-
 {tools}
-
-{date}
 """
 
 
@@ -90,10 +71,11 @@ def build_system_prompt(settings: Settings) -> str:
     """Build the complete system prompt for the Finders agent.
 
     Assembles modular sections into a structured system prompt, including
-    identity, core principles, workflow guidance, tool usage guidelines,
-    and dynamic date at the end.
+    identity, core principles, workflow guidance, and tool usage guidelines.
 
-    Skills are injected separately by SkillsMiddleware via `before_model`.
+    Dynamic context (current date) is injected by DynamicContextMiddleware.
+    Skills are injected by SkillsMiddleware.
+    TODO list guidance is injected by TodoListMiddleware.
 
     Args:
         settings: Application settings containing configuration values.
@@ -101,13 +83,9 @@ def build_system_prompt(settings: Settings) -> str:
     Returns:
         A fully formatted system prompt string.
     """
-    date_str = datetime.now().strftime("%A, %B %d, %Y")
-
     return SYSTEM_PROMPT_TEMPLATE.format(
         identity=IDENTITY_SECTION,
-        date=DATE_SECTION.format(date=date_str),
         core_principles=BEHAVIOR_SECTION,
         workflow=WORKFLOW_SECTION,
-        task_management=TODO_GUIDANCE,
         tools=TOOLS_SECTION,
     )
