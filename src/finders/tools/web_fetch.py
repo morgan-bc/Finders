@@ -1,11 +1,12 @@
 """Web fetch tool using jinaai + markdownify fallback."""
+import os
 import re
 import httpx
 from langchain_core.tools import tool
 from markdownify import markdownify
 
 
-JINA_WEB_FETCH_BASE = "https://r.jina.ai"
+JINA_WEB_FETCH_BASE = os.environ.get("JINA_WEB_FETCH_BASE", "https://r.jina.ai")
 
 
 def parse_jina_response(text: str) -> tuple[str, str]:
