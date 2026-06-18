@@ -81,6 +81,8 @@ class SkillsMiddleware(AgentMiddleware):
     Args:
         skills_dir: Path to the user-level skills directory.
         project_skills_dir: Optional path to project-level skills directory.
+        allowed: Optional list of skill names to allow. If set, only these skills are loaded.
+        disallowed: Optional list of skill names to exclude.
     """
 
     def __init__(
@@ -88,17 +90,23 @@ class SkillsMiddleware(AgentMiddleware):
         *,
         skills_dir: str | Path,
         project_skills_dir: str | Path | None = None,
+        allowed: list[str] | None = None,
+        disallowed: list[str] | None = None,
     ) -> None:
         """Initialize the skills middleware.
 
         Args:
             skills_dir: Path to the user-level skills directory.
             project_skills_dir: Optional path to the project-level skills directory.
+            allowed: Optional list of skill names to allow. If set, only these skills are loaded.
+            disallowed: Optional list of skill names to exclude.
         """
         self.skills_dir = Path(skills_dir).expanduser()
         self.project_skills_dir = (
             Path(project_skills_dir).expanduser() if project_skills_dir else None
         )
+        self.allowed = set(allowed) if allowed else None
+        self.disallowed = set(disallowed) if disallowed else None
 
     def before_agent(self, state: dict[str, Any], runtime) -> dict[str, Any] | None:
         """Load skills metadata before agent execution.
@@ -117,6 +125,13 @@ class SkillsMiddleware(AgentMiddleware):
             user_skills_dir=self.skills_dir,
             project_skills_dir=self.project_skills_dir,
         )
+
+        # Filter skills based on allowed/disallowed lists
+        if self.allowed is not None:
+            skills = [s for s in skills if s["name"] in self.allowed]
+        if self.disallowed is not None:
+            skills = [s for s in skills if s["name"] not in self.disallowed]
+
         return {"skills_metadata": skills}
 
     def before_model(self, state: dict[str, Any], runtime) -> dict[str, Any] | None:

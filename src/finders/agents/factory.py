@@ -20,7 +20,7 @@ from finders.skills.middleware import SkillsMiddleware
 from finders.middlewares.dynamic_context import DynamicContextMiddleware
 
 
-def _build_middleware(settings: Settings):
+def _build_middleware(settings: Settings, allowed_skills: list[str] | None = None, disallowed_skills: list[str] | None = None):
     """Build middleware pipeline for agent."""
     model = settings.create_chat_model()
     fast_model = settings.create_chat_model(fast=True)
@@ -29,6 +29,8 @@ def _build_middleware(settings: Settings):
         SkillsMiddleware(
             skills_dir=Path.home() / ".finders" / "skills",
             project_skills_dir=Path.cwd() / ".finders" / "skills",
+            allowed=allowed_skills,
+            disallowed=disallowed_skills,
         ),
         DynamicContextMiddleware(),
         TodoListMiddleware(),
