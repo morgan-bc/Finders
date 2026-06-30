@@ -163,17 +163,21 @@ class SkillsMiddleware(AgentMiddleware):
     def _to_virtual_path(self, path: str) -> str:
         """Convert a local skill path to a virtual container path.
 
-        All skills map to /skills/... so that paths surfaced in prompts are
-        virtual paths resolvable by the sandbox.
+        Project skills map to /proj_skill/... and user skills map to
+        /user_skill/... so that all paths surfaced in prompts are virtual
+        paths resolvable by the sandbox.
         """
         p = str(Path(path).expanduser().resolve())
-        for skills_root in (self.project_skills_dir, self.skills_dir):
-            if skills_root is None:
-                continue
-            root = str(skills_root.expanduser().resolve())
-            if p == root or p.startswith(root + os.sep):
-                rel = p[len(root):].lstrip(os.sep).replace(os.sep, "/")
-                return f"/skills/{rel}" if rel else "/skills"
+        if self.project_skills_dir is not None:
+            proj = str(self.project_skills_dir.expanduser().resolve())
+            if p == proj or p.startswith(proj + os.sep):
+                rel = p[len(proj):].lstrip(os.sep).replace(os.sep, "/")
+                return f"/proj_skill/{rel}" if rel else "/proj_skill"
+        if self.skills_dir is not None:
+            usr = str(self.skills_dir.expanduser().resolve())
+            if p == usr or p.startswith(usr + os.sep):
+                rel = p[len(usr):].lstrip(os.sep).replace(os.sep, "/")
+                return f"/user_skill/{rel}" if rel else "/user_skill"
         return path
 
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:

@@ -32,7 +32,7 @@ When tackling a complex research question, follow this structured approach:
 3. **Execute Systematically**:
    - Use `web_search` to find relevant sources and information
    - Use `web_fetch` to read specific pages and extract detailed content
-   - Use file tools (`read_file`, `list_dir`, `glob`, `grep`) to access files under `/workspace` (your working directory) and `/skills` (skills library)
+   - Use file tools (`read_file`, `list_dir`, `glob`, `grep`) to access files under `/workspace` (your working directory), `/user_skill` (user-level skills) and `/proj_skill` (project-level skills)
    - Use `task_tool` to delegate subtasks for parallel execution when appropriate
    - Use `memory_search` to recall relevant past research (if enabled)
 4. **Synthesize and Verify**:
@@ -47,7 +47,7 @@ When tackling a complex research question, follow this structured approach:
 - **Search first, fetch second**: Use `web_search` to find relevant URLs, then `web_fetch` to read specific pages
 - **Parallel execution**: When possible, execute independent tool calls concurrently (e.g., multiple `web_search` or `web_fetch` calls)
 - **Iterative refinement**: Use search results to refine your next search query
-- **Local file access**: Use `read_file`, `list_dir`, `glob`, and `grep` to work with files under `/workspace` (writable working directory) and `/skills` (writable skills library). Always reference these virtual paths — never use raw local filesystem paths.
+- **Local file access**: Use `read_file`, `list_dir`, `glob`, and `grep` to work with files under `/workspace` (writable working directory), `/user_skill` (user-level skills) and `/proj_skill` (project-level skills). Always reference these virtual paths — never use raw local filesystem paths.
 - **Task delegation**: Use `task_tool` to delegate independent subtasks that can run in parallel
 - **Memory recall**: Use `memory_search` to search past research and context (when memory is enabled)
 </instruction>"""

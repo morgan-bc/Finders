@@ -26,14 +26,18 @@ def sandbox_with_readonly(tmp_path):
 
 @pytest.fixture
 def sandbox_with_skills(tmp_path):
-    """Sandbox with /skills (read-write) mapping."""
+    """Sandbox with /user_skill (user skills, read-write) and /proj_skill (project skills, read-write) mappings."""
     ws = tmp_path / "workspace"
     ws.mkdir()
-    skill_dir = tmp_path / "skills"
-    skill_dir.mkdir()
-    (skill_dir / "web-research" / "SKILL.md").parent.mkdir(parents=True)
-    (skill_dir / "web-research" / "SKILL.md").write_text("# web-research", encoding="utf-8")
-    return LocalSandbox(ws, skill_dir=skill_dir)
+    user_skill_dir = tmp_path / "user" / ".finders" / "skills"
+    user_skill_dir.mkdir(parents=True)
+    (user_skill_dir / "code-review" / "SKILL.md").parent.mkdir(parents=True)
+    (user_skill_dir / "code-review" / "SKILL.md").write_text("# code-review", encoding="utf-8")
+    project_skill_dir = tmp_path / "project" / ".finders" / "skills"
+    project_skill_dir.mkdir(parents=True)
+    (project_skill_dir / "web-research" / "SKILL.md").parent.mkdir(parents=True)
+    (project_skill_dir / "web-research" / "SKILL.md").write_text("# web-research", encoding="utf-8")
+    return LocalSandbox(ws, user_skill_dir=user_skill_dir, project_skill_dir=project_skill_dir)
 
 
 def test_read_file_success(sandbox):
@@ -264,21 +268,30 @@ def test_read_only_edit_file(sandbox_with_readonly):
         sb.edit_file("../readonly/reference.txt", "original", "modified")
 
 
-# --- /skills virtual path tests ---
+# --- /user_skill and /proj_skill virtual path tests ---
 
-def test_skills_mapping_created(sandbox_with_skills):
-    """Sandbox should have /workspace and /skills mappings."""
+def test_skill_mappings_created(sandbox_with_skills):
+    """Sandbox should have /workspace, /user_skill, and /proj_skill mappings."""
     containers = [m.container_path for m in sandbox_with_skills.path_mappings]
     assert "/workspace" in containers
-    assert "/skills" in containers
-    skills_mapping = next(m for m in sandbox_with_skills.path_mappings if m.container_path == "/skills")
-    assert skills_mapping.read_only is False
+    assert "/user_skill" in containers
+    assert "/proj_skill" in containers
+    user_mapping = next(m for m in sandbox_with_skills.path_mappings if m.container_path == "/user_skill")
+    proj_mapping = next(m for m in sandbox_with_skills.path_mappings if m.container_path == "/proj_skill")
+    assert user_mapping.read_only is False
+    assert proj_mapping.read_only is False
 
 
-def test_read_skill_via_virtual_path(sandbox_with_skills):
-    """read_file should resolve /skills/<skill>/SKILL.md to the skills dir."""
-    content = sandbox_with_skills.read_file("/skills/web-research/SKILL.md")
+def test_read_project_skill_via_virtual_path(sandbox_with_skills):
+    """read_file should resolve /proj_skill/<skill>/SKILL.md to the project skills dir."""
+    content = sandbox_with_skills.read_file("/proj_skill/web-research/SKILL.md")
     assert "# web-research" in content
+
+
+def test_read_user_skill_via_virtual_path(sandbox_with_skills):
+    """read_file should resolve /user_skill/<skill>/SKILL.md to the user skills dir."""
+    content = sandbox_with_skills.read_file("/user_skill/code-review/SKILL.md")
+    assert "# code-review" in content
 
 
 def test_read_workspace_via_virtual_path(sandbox_with_skills):
@@ -287,16 +300,28 @@ def test_read_workspace_via_virtual_path(sandbox_with_skills):
     assert sandbox_with_skills.read_file("/workspace/note.txt") == "hello"
 
 
-def test_write_to_skills_succeeds(sandbox_with_skills):
-    """Writing to /skills (read-write) should succeed."""
-    sandbox_with_skills.write_file("/skills/new.txt", "ok")
-    assert sandbox_with_skills.read_file("/skills/new.txt") == "ok"
+def test_write_to_proj_skill_succeeds(sandbox_with_skills):
+    """Writing to /proj_skill (read-write) should succeed."""
+    sandbox_with_skills.write_file("/proj_skill/new.txt", "ok")
+    assert sandbox_with_skills.read_file("/proj_skill/new.txt") == "ok"
 
 
-def test_skills_traversal_blocked(sandbox_with_skills):
-    """Traversal via /skills/../.. should be blocked."""
+def test_write_to_user_skill_succeeds(sandbox_with_skills):
+    """Writing to /user_skill (read-write) should succeed."""
+    sandbox_with_skills.write_file("/user_skill/new.txt", "ok")
+    assert sandbox_with_skills.read_file("/user_skill/new.txt") == "ok"
+
+
+def test_proj_skill_traversal_blocked(sandbox_with_skills):
+    """Traversal via /proj_skill/../.. should be blocked."""
     with pytest.raises(PermissionError):
-        sandbox_with_skills.read_file("/skills/../../etc/passwd")
+        sandbox_with_skills.read_file("/proj_skill/../../etc/passwd")
+
+
+def test_user_skill_traversal_blocked(sandbox_with_skills):
+    """Traversal via /user_skill/../.. should be blocked."""
+    with pytest.raises(PermissionError):
+        sandbox_with_skills.read_file("/user_skill/../../etc/passwd")
 
 
 def test_workspace_virtual_path_still_secured(sandbox_with_skills):
