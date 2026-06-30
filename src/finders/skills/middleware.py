@@ -153,7 +153,7 @@ class SkillsMiddleware(AgentMiddleware):
         messages = list(state.get("messages", []))
         if messages and isinstance(messages[0], SystemMessage):
             original_content = messages[0].content
-            if isinstance(original_content, str) and "## Skills System" not in original_content:
+            if isinstance(original_content, str) and "<skills_system>" not in original_content:
                 skills_suffix = f"\n\n{skills_section}"
                 messages[0] = SystemMessage(content=original_content + skills_suffix)
                 return {"messages": messages}
@@ -163,19 +163,16 @@ class SkillsMiddleware(AgentMiddleware):
     def _to_virtual_path(self, path: str) -> str:
         """Convert a local skill path to a virtual container path.
 
-        Project skills map to /project/... and user skills map to /skills/...
-        so that all paths surfaced in prompts are virtual paths.
+        All skills map to /skills/... so that paths surfaced in prompts are
+        virtual paths resolvable by the sandbox.
         """
         p = str(Path(path).expanduser().resolve())
-        if self.project_skills_dir is not None:
-            proj = str(self.project_skills_dir.expanduser().resolve())
-            if p == proj or p.startswith(proj + os.sep):
-                rel = p[len(proj):].lstrip(os.sep).replace(os.sep, "/")
-                return f"/project/{rel}" if rel else "/project"
-        if self.skills_dir is not None:
-            usr = str(self.skills_dir.expanduser().resolve())
-            if p == usr or p.startswith(usr + os.sep):
-                rel = p[len(usr):].lstrip(os.sep).replace(os.sep, "/")
+        for skills_root in (self.project_skills_dir, self.skills_dir):
+            if skills_root is None:
+                continue
+            root = str(skills_root.expanduser().resolve())
+            if p == root or p.startswith(root + os.sep):
+                rel = p[len(root):].lstrip(os.sep).replace(os.sep, "/")
                 return f"/skills/{rel}" if rel else "/skills"
         return path
 

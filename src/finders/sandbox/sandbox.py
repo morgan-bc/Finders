@@ -265,8 +265,7 @@ class LocalSandbox:
     def __init__(
         self,
         workspace: Path | None = None,
-        project_dir: Path | None = None,
-        user_skills_dir: Path | None = None,
+        skill_dir: Path | None = None,
         path_mappings: Optional[list[PathMapping]] = None,
     ):
         if workspace is None:
@@ -278,15 +277,10 @@ class LocalSandbox:
         # Default mapping: /workspace -> actual workspace directory (read-write)
         mappings = [PathMapping("/workspace", str(self.workspace))]
 
-        # /project -> project skills directory (read-only reference material)
-        if project_dir is not None:
-            project_resolved = Path(project_dir).expanduser().resolve()
-            mappings.append(PathMapping("/project", str(project_resolved), read_only=True))
-
-        # /skills -> user-level skills directory (read-only reference material)
-        if user_skills_dir is not None:
-            user_resolved = Path(user_skills_dir).expanduser().resolve()
-            mappings.append(PathMapping("/skills", str(user_resolved), read_only=True))
+        # /skills -> skills directory (read-write)
+        if skill_dir is not None:
+            skill_resolved = Path(skill_dir).expanduser().resolve()
+            mappings.append(PathMapping("/skills", str(skill_resolved)))
 
         if path_mappings:
             mappings.extend(path_mappings)
@@ -464,7 +458,7 @@ class LocalSandbox:
     def _resolve_and_secure(self, path: str) -> Path:
         """Resolve a path (virtual or relative) and ensure it lies within an allowed root.
 
-        Virtual paths (e.g. /workspace, /project, /skills) are resolved via the
+        Virtual paths (e.g. /workspace, /skills) are resolved via the
         path mappings and validated against their mapped local roots. Relative
         paths are treated as workspace-relative and secured against the workspace.
         """
