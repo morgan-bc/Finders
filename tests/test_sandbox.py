@@ -24,6 +24,22 @@ def sandbox_with_readonly(tmp_path):
     return LocalSandbox(ws, path_mappings=mappings)
 
 
+@pytest.fixture
+def sandbox_with_project(tmp_path):
+    """Sandbox with /project (project skills, read-only) and /skills (user skills, read-only) mappings."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    project_dir = tmp_path / "project" / ".finders" / "skills"
+    project_dir.mkdir(parents=True)
+    (project_dir / "web-research" / "SKILL.md").parent.mkdir(parents=True)
+    (project_dir / "web-research" / "SKILL.md").write_text("# web-research", encoding="utf-8")
+    user_skills_dir = tmp_path / "user" / ".finders" / "skills"
+    user_skills_dir.mkdir(parents=True)
+    (user_skills_dir / "code-review" / "SKILL.md").parent.mkdir(parents=True)
+    (user_skills_dir / "code-review" / "SKILL.md").write_text("# code-review", encoding="utf-8")
+    return LocalSandbox(ws, project_dir=project_dir, user_skills_dir=user_skills_dir)
+
+
 def test_read_file_success(sandbox):
     target = sandbox.workspace / "test.txt"
     target.write_text("hello world", encoding="utf-8")
@@ -250,3 +266,68 @@ def test_read_only_edit_file(sandbox_with_readonly):
     with pytest.raises(OSError):
         # The path resolves through the readonly mapping
         sb.edit_file("../readonly/reference.txt", "original", "modified")
+
+
+# --- /project and /skills virtual path tests ---
+
+def test_project_and_skills_mappings_created(sandbox_with_project):
+    """Sandbox should have /workspace, /project, and /skills mappings."""
+    containers = [m.container_path for m in sandbox_with_project.path_mappings]
+    assert "/workspace" in containers
+    assert "/project" in containers
+    assert "/skills" in containers
+    project_mapping = next(m for m in sandbox_with_project.path_mappings if m.container_path == "/project")
+    skills_mapping = next(m for m in sandbox_with_project.path_mappings if m.container_path == "/skills")
+    assert project_mapping.read_only is True
+    assert skills_mapping.read_only is True
+
+
+def test_read_project_skill_via_virtual_path(sandbox_with_project):
+    """read_file should resolve /project/<skill>/SKILL.md to the project skills dir."""
+    content = sandbox_with_project.read_file("/project/web-research/SKILL.md")
+    assert "# web-research" in content
+
+
+def test_read_user_skill_via_virtual_path(sandbox_with_project):
+    """read_file should resolve /skills/<skill>/SKILL.md to the user skills dir."""
+    content = sandbox_with_project.read_file("/skills/code-review/SKILL.md")
+    assert "# code-review" in content
+
+
+def test_read_workspace_via_virtual_path(sandbox_with_project):
+    """read_file should resolve /workspace/... to the workspace dir."""
+    (sandbox_with_project.workspace / "note.txt").write_text("hello", encoding="utf-8")
+    assert sandbox_with_project.read_file("/workspace/note.txt") == "hello"
+
+
+def test_write_to_project_rejected(sandbox_with_project):
+    """Writing to /project (read-only) should raise OSError."""
+    with pytest.raises(OSError):
+        sandbox_with_project.write_file("/project/new.txt", "bad")
+
+
+def test_write_to_skills_rejected(sandbox_with_project):
+    """Writing to /skills (read-only) should raise OSError."""
+    with pytest.raises(OSError):
+        sandbox_with_project.write_file("/skills/new.txt", "bad")
+
+
+def test_project_traversal_blocked(sandbox_with_project):
+    """Traversal via /project/../.. should be blocked."""
+    with pytest.raises(PermissionError):
+        sandbox_with_project.read_file("/project/../../etc/passwd")
+
+
+def test_workspace_virtual_path_still_secured(sandbox_with_project):
+    """Traversal via /workspace/.. should be blocked."""
+    with pytest.raises(PermissionError):
+        sandbox_with_project.read_file("/workspace/../outside.txt")
+
+
+def test_finders_workspace_env_var(monkeypatch, tmp_path):
+    """Sandbox should read FINDERS_WORKSPACE from env when workspace is None."""
+    ws = tmp_path / "env_workspace"
+    monkeypatch.setenv("FINDERS_WORKSPACE", str(ws))
+    sb = LocalSandbox()
+    assert sb.workspace == ws.resolve()
+    assert sb.workspace.exists()

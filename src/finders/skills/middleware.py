@@ -25,6 +25,7 @@ Example structure:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -159,6 +160,25 @@ class SkillsMiddleware(AgentMiddleware):
 
         return None
 
+    def _to_virtual_path(self, path: str) -> str:
+        """Convert a local skill path to a virtual container path.
+
+        Project skills map to /project/... and user skills map to /skills/...
+        so that all paths surfaced in prompts are virtual paths.
+        """
+        p = str(Path(path).expanduser().resolve())
+        if self.project_skills_dir is not None:
+            proj = str(self.project_skills_dir.expanduser().resolve())
+            if p == proj or p.startswith(proj + os.sep):
+                rel = p[len(proj):].lstrip(os.sep).replace(os.sep, "/")
+                return f"/project/{rel}" if rel else "/project"
+        if self.skills_dir is not None:
+            usr = str(self.skills_dir.expanduser().resolve())
+            if p == usr or p.startswith(usr + os.sep):
+                rel = p[len(usr):].lstrip(os.sep).replace(os.sep, "/")
+                return f"/skills/{rel}" if rel else "/skills"
+        return path
+
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:
         """Format skills metadata for display in system prompt."""
         if not skills:
@@ -166,10 +186,11 @@ class SkillsMiddleware(AgentMiddleware):
 
         lines = ["<available_skills>"]
         for skill in skills:
+            location = self._to_virtual_path(skill["path"])
             lines.append(
                 f"  <skill name={skill['name']}>\n"
                 f"    <description>{skill['description']}</description>\n"
-                f"    <location>{skill['path']}</location>\n"
+                f"    <location>{location}</location>\n"
                 f"  </skill>"
             )
         lines.append("</available_skills>")
