@@ -11,11 +11,11 @@ from langchain_core.messages import SystemMessage
 
 
 CURRENT_DATE_PROMPT = """
-## System reminder
-
+<system_reminder>
 Current Date: {date}
 
 Always use this actual date when forming search queries, referencing time-sensitive information, or generating reports. Never use hardcoded past years or placeholder dates.
+</system_reminder>
 """
 
 

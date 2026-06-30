@@ -34,9 +34,7 @@ from langchain_core.messages import SystemMessage
 from finders.skills.load import SkillMetadata, list_skills
 
 SKILLS_SYSTEM_PROMPT = """
-
-## Skills System
-
+<skills_system>
 You have access to a skills library that provides specialized capabilities and domain knowledge.
 
 **Available Skills:**
@@ -62,6 +60,7 @@ Skills follow a **progressive disclosure** pattern - you know they exist (name +
 - The skill list above shows the full path for each skill's SKILL.md file
 
 Remember: Skills are tools to make you more capable and consistent. When in doubt, check if a skill exists for the task!
+</skills_system>
 """
 
 

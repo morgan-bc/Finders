@@ -19,7 +19,8 @@ from finders.utils.tokens import estimate_tokens
 
 MEMORY_FLUSH_TOKEN = "NO_MEMORY_TO_FLUSH"
 
-FLUSH_PROMPT = """Session context is close to compaction. Summarize durable facts and user preferences worth remembering long-term.
+FLUSH_PROMPT = """<memory_flush>
+Session context is close to compaction. Summarize durable facts and user preferences worth remembering long-term.
 
 Rules:
 - Output concise markdown bullet points.
@@ -35,6 +36,7 @@ Rules:
   - Time horizons and liquidity needs
 - Do not include temporary tool output, market data, or stock prices.
 - If nothing should be stored, reply exactly with ${MEMORY_FLUSH_TOKEN}.
+</memory_flush>
 """
 
 
