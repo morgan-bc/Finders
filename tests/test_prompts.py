@@ -4,7 +4,6 @@ from finders.agents.prompt import (
     SYSTEM_PROMPT_TEMPLATE,
     IDENTITY_SECTION,
     INSTRUCTION_SECTION,
-    TOOLS_SECTION,
 )
 from finders.utils.config import Settings
 
@@ -28,7 +27,6 @@ def test_system_prompt_template_structure():
     """Test that template contains expected placeholders."""
     assert "{identity}" in SYSTEM_PROMPT_TEMPLATE
     assert "{instruction}" in SYSTEM_PROMPT_TEMPLATE
-    assert "{tools}" in SYSTEM_PROMPT_TEMPLATE
 
 
 def test_prompt_contains_all_sections():
@@ -41,7 +39,7 @@ def test_prompt_contains_all_sections():
     assert "financial research assistant" in prompt
     assert "Core Principles" in prompt
     assert "Research Workflow" in prompt
-    assert "Available Tools" in prompt
+    assert "Tool Usage Guidelines" in prompt
     assert "Evidence-driven" in prompt
 
 

@@ -41,15 +41,8 @@ When tackling a complex research question, follow this structured approach:
 5. **Deliver the Answer**: Structure your response clearly, starting with the direct answer, then supporting evidence and citations.
 
 **Dynamic Planning**: If you discover new avenues of research during your investigation, adjust your strategy and try different search terms or sources.
-</instruction>"""
 
-TOOLS_SECTION = """\
-<tools>
-## Available Tools
-
-You have access to a set of tools for web search, web content retrieval, file operations, task delegation, and memory recall. Tool descriptions and schemas are provided separately.
-
-### Tool Usage Guidelines
+## Tool Usage Guidelines
 
 - **Search first, fetch second**: Use `web_search` to find relevant URLs, then `web_fetch` to read specific pages
 - **Parallel execution**: When possible, execute independent tool calls concurrently (e.g., multiple `web_search` or `web_fetch` calls)
@@ -57,14 +50,12 @@ You have access to a set of tools for web search, web content retrieval, file op
 - **Local file access**: Use `read_file`, `list_dir`, `glob`, and `grep` to work with local files in your workspace
 - **Task delegation**: Use `task_tool` to delegate independent subtasks that can run in parallel
 - **Memory recall**: Use `memory_search` to search past research and context (when memory is enabled)
-</tools>"""
+</instruction>"""
 
 
 SYSTEM_PROMPT_TEMPLATE = """{identity}
 
 {instruction}
-
-{tools}
 """
 
 
@@ -72,7 +63,7 @@ def build_system_prompt(settings: Settings) -> str:
     """Build the complete system prompt for the Finders agent.
 
     Assembles modular sections into a structured system prompt, including
-    identity, instruction (core principles + workflow), and tool usage guidelines.
+    identity and instruction (core principles + workflow + tool usage guidelines).
 
     Dynamic context (current date) is injected by DynamicContextMiddleware.
     Skills are injected by SkillsMiddleware.
@@ -87,5 +78,4 @@ def build_system_prompt(settings: Settings) -> str:
     return SYSTEM_PROMPT_TEMPLATE.format(
         identity=IDENTITY_SECTION,
         instruction=INSTRUCTION_SECTION,
-        tools=TOOLS_SECTION,
     )

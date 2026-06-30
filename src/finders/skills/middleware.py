@@ -37,8 +37,6 @@ SKILLS_SYSTEM_PROMPT = """
 <skills_system>
 You have access to a skills library that provides specialized capabilities and domain knowledge.
 
-**Available Skills:**
-
 {skills_list}
 
 **How to Use Skills (Progressive Disclosure):**
@@ -164,14 +162,16 @@ class SkillsMiddleware(AgentMiddleware):
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:
         """Format skills metadata for display in system prompt."""
         if not skills:
-            return "(No skills available)"
+            return "<available_skills></available_skills>"
 
-        lines = []
+        lines = ["<available_skills>"]
         for skill in skills:
-            source_tag = " [user]" if skill["source"] == "user" else " [project]"
             lines.append(
-                f"- **{skill['name']}**: {skill['description']}{source_tag}\n"
-                f"  → Read `{skill['path']}` for full instructions"
+                f"  <skill name={skill['name']}>\n"
+                f"    <description>{skill['description']}</description>\n"
+                f"    <location>{skill['path']}</location>\n"
+                f"  </skill>"
             )
+        lines.append("</available_skills>")
 
         return "\n".join(lines)
