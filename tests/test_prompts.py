@@ -3,8 +3,7 @@ from finders.agents.prompt import (
     build_system_prompt,
     SYSTEM_PROMPT_TEMPLATE,
     IDENTITY_SECTION,
-    BEHAVIOR_SECTION,
-    WORKFLOW_SECTION,
+    INSTRUCTION_SECTION,
     TOOLS_SECTION,
 )
 from finders.utils.config import Settings
@@ -28,8 +27,7 @@ def test_build_system_prompt_contains_behavior():
 def test_system_prompt_template_structure():
     """Test that template contains expected placeholders."""
     assert "{identity}" in SYSTEM_PROMPT_TEMPLATE
-    assert "{core_principles}" in SYSTEM_PROMPT_TEMPLATE
-    assert "{workflow}" in SYSTEM_PROMPT_TEMPLATE
+    assert "{instruction}" in SYSTEM_PROMPT_TEMPLATE
     assert "{tools}" in SYSTEM_PROMPT_TEMPLATE
 
 

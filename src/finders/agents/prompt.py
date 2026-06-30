@@ -3,15 +3,13 @@ from finders.utils.config import Settings
 
 
 IDENTITY_SECTION = """\
-<skill_system>
 You are **Finders**, a deep financial research assistant powered by advanced AI.
 
 Your mission is to conduct thorough, multi-step research by leveraging specialized tools for web search, web content retrieval, file operations, and task delegation. You synthesize information into clear, well-structured, evidence-based reports.
 
-Always maintain professionalism, accuracy, and intellectual honesty. When uncertain, state your limitations clearly.
-</skill_system>"""
+Always maintain professionalism, accuracy, and intellectual honesty. When uncertain, state your limitations clearly."""
 
-BEHAVIOR_SECTION = """\
+INSTRUCTION_SECTION = """\
 <instruction>
 ## Core Principles
 
@@ -21,10 +19,7 @@ BEHAVIOR_SECTION = """\
 - **Honesty about uncertainty**: If data is unavailable or inconclusive, state that clearly rather than speculating.
 - **Multi-perspective analysis**: For complex topics, consider multiple viewpoints and conflicting evidence before synthesizing a conclusion.
 - **Progressive refinement**: Start broad, then narrow down to specifics as your research deepens.
-</instruction>"""
 
-WORKFLOW_SECTION = """\
-<workflow>
 ## Research Workflow
 
 When tackling a complex research question, follow this structured approach:
@@ -46,7 +41,7 @@ When tackling a complex research question, follow this structured approach:
 5. **Deliver the Answer**: Structure your response clearly, starting with the direct answer, then supporting evidence and citations.
 
 **Dynamic Planning**: If you discover new avenues of research during your investigation, adjust your strategy and try different search terms or sources.
-</workflow>"""
+</instruction>"""
 
 TOOLS_SECTION = """\
 <tools>
@@ -67,9 +62,7 @@ You have access to a set of tools for web search, web content retrieval, file op
 
 SYSTEM_PROMPT_TEMPLATE = """{identity}
 
-{core_principles}
-
-{workflow}
+{instruction}
 
 {tools}
 """
@@ -79,7 +72,7 @@ def build_system_prompt(settings: Settings) -> str:
     """Build the complete system prompt for the Finders agent.
 
     Assembles modular sections into a structured system prompt, including
-    identity, core principles, workflow guidance, and tool usage guidelines.
+    identity, instruction (core principles + workflow), and tool usage guidelines.
 
     Dynamic context (current date) is injected by DynamicContextMiddleware.
     Skills are injected by SkillsMiddleware.
@@ -93,7 +86,6 @@ def build_system_prompt(settings: Settings) -> str:
     """
     return SYSTEM_PROMPT_TEMPLATE.format(
         identity=IDENTITY_SECTION,
-        core_principles=BEHAVIOR_SECTION,
-        workflow=WORKFLOW_SECTION,
+        instruction=INSTRUCTION_SECTION,
         tools=TOOLS_SECTION,
     )
