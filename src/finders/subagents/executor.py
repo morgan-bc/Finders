@@ -100,6 +100,7 @@ class SubagentExecutor:
             settings,
             allowed_skills=self.config.allowed_skills,
             disallowed_skills=self.config.disallowed_skills,
+            max_calls_per_tool=self.config.max_calls_per_tool,
         )
 
         return create_agent(
