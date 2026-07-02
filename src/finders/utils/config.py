@@ -11,6 +11,7 @@ class AgentConfig(BaseModel):
     model: str = Field(default="deepseek-v4-flash", description="LLM 模型名称")
     fast_model: str = Field(default="deepseek-v4-flash", description="快速模型（用于压缩等辅助任务）")
     max_iterations: int = Field(default=10, ge=1, le=50)
+    recursion_limit: int = Field(default=100, ge=1, le=1000, description="Agent 递归调用限制")
     compact_threshold: int = Field(default=100_000, description="触发压缩的 token 阈值")
     enable_todo: bool = Field(default=True, description="启用 TODO 任务清单（分解复杂任务）")
 

@@ -78,4 +78,5 @@ def create_finders_agent(settings: Settings):
         tools=tools,
         system_prompt=system_prompt,
         middleware=middleware,
+        recursion_limit=settings.agent.recursion_limit,
     )
