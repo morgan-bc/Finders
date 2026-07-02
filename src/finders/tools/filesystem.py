@@ -1,5 +1,7 @@
 """File system tools for finders backed by LocalSandbox."""
 
+from pathlib import Path
+
 from langchain_core.tools import tool
 
 from finders.sandbox import LocalSandbox
@@ -7,7 +9,13 @@ from finders.utils.config import get_settings
 
 
 _settings = get_settings()
-_sandbox = LocalSandbox(_settings.get_workspace_path())
+_workspace = _settings.get_workspace_path()
+_project_dir = _settings.get_project_dir()
+_sandbox = LocalSandbox(
+    _workspace,
+    user_skill_dir=_workspace / "skills",
+    project_skill_dir=_project_dir / "skills",
+)
 
 
 @tool

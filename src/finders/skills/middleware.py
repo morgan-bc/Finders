@@ -25,6 +25,7 @@ Example structure:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -34,12 +35,8 @@ from langchain_core.messages import SystemMessage
 from finders.skills.load import SkillMetadata, list_skills
 
 SKILLS_SYSTEM_PROMPT = """
-
-## Skills System
-
+<skills_system>
 You have access to a skills library that provides specialized capabilities and domain knowledge.
-
-**Available Skills:**
 
 {skills_list}
 
@@ -62,6 +59,7 @@ Skills follow a **progressive disclosure** pattern - you know they exist (name +
 - The skill list above shows the full path for each skill's SKILL.md file
 
 Remember: Skills are tools to make you more capable and consistent. When in doubt, check if a skill exists for the task!
+</skills_system>
 """
 
 
@@ -155,24 +153,47 @@ class SkillsMiddleware(AgentMiddleware):
         messages = list(state.get("messages", []))
         if messages and isinstance(messages[0], SystemMessage):
             original_content = messages[0].content
-            if isinstance(original_content, str) and "## Skills System" not in original_content:
+            if isinstance(original_content, str) and "<skills_system>" not in original_content:
                 skills_suffix = f"\n\n{skills_section}"
                 messages[0] = SystemMessage(content=original_content + skills_suffix)
                 return {"messages": messages}
 
         return None
 
+    def _to_virtual_path(self, path: str) -> str:
+        """Convert a local skill path to a virtual container path.
+
+        Project skills map to /proj_skill/... and user skills map to
+        /user_skill/... so that all paths surfaced in prompts are virtual
+        paths resolvable by the sandbox.
+        """
+        p = str(Path(path).expanduser().resolve())
+        if self.project_skills_dir is not None:
+            proj = str(self.project_skills_dir.expanduser().resolve())
+            if p == proj or p.startswith(proj + os.sep):
+                rel = p[len(proj):].lstrip(os.sep).replace(os.sep, "/")
+                return f"/proj_skill/{rel}" if rel else "/proj_skill"
+        if self.skills_dir is not None:
+            usr = str(self.skills_dir.expanduser().resolve())
+            if p == usr or p.startswith(usr + os.sep):
+                rel = p[len(usr):].lstrip(os.sep).replace(os.sep, "/")
+                return f"/user_skill/{rel}" if rel else "/user_skill"
+        return path
+
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:
         """Format skills metadata for display in system prompt."""
         if not skills:
-            return "(No skills available)"
+            return "<available_skills></available_skills>"
 
-        lines = []
+        lines = ["<available_skills>"]
         for skill in skills:
-            source_tag = " [user]" if skill["source"] == "user" else " [project]"
+            location = self._to_virtual_path(skill["path"])
             lines.append(
-                f"- **{skill['name']}**: {skill['description']}{source_tag}\n"
-                f"  → Read `{skill['path']}` for full instructions"
+                f"  <skill name={skill['name']}>\n"
+                f"    <description>{skill['description']}</description>\n"
+                f"    <location>{location}</location>\n"
+                f"  </skill>"
             )
+        lines.append("</available_skills>")
 
         return "\n".join(lines)

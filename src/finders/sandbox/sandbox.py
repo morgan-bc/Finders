@@ -262,16 +262,35 @@ class LocalSandbox:
     filesystem paths. All operations are restricted to mapped paths for security.
     """
 
-    def __init__(self, workspace: Path, path_mappings: Optional[list[PathMapping]] = None):
-        self.workspace = Path(workspace).resolve()
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        user_skill_dir: Path | None = None,
+        project_skill_dir: Path | None = None,
+        path_mappings: Optional[list[PathMapping]] = None,
+    ):
+        if workspace is None:
+            ws_env = os.environ.get("FINDERS_WORKSPACE")
+            workspace = Path(ws_env).expanduser() if ws_env else Path.home() / ".finders" / "workspace"
+        self.workspace = Path(workspace).expanduser().resolve()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
-        # Default mapping: /workspace -> actual workspace directory
-        default_mapping = PathMapping("/workspace", str(self.workspace))
+        # Default mapping: /workspace -> actual workspace directory (read-write)
+        mappings = [PathMapping("/workspace", str(self.workspace))]
+
+        # /user_skill -> user-level skills directory (read-write)
+        if user_skill_dir is not None:
+            user_resolved = Path(user_skill_dir).expanduser().resolve()
+            mappings.append(PathMapping("/user_skill", str(user_resolved)))
+
+        # /proj_skill -> project-level skills directory (read-write)
+        if project_skill_dir is not None:
+            project_resolved = Path(project_skill_dir).expanduser().resolve()
+            mappings.append(PathMapping("/proj_skill", str(project_resolved)))
+
         if path_mappings:
-            self.path_mappings = [default_mapping] + list(path_mappings)
-        else:
-            self.path_mappings = [default_mapping]
+            mappings.extend(path_mappings)
+        self.path_mappings = mappings
 
         # Track files written through write_file so read_file can reverse-resolve
         # paths in agent-authored content.
@@ -443,7 +462,24 @@ class LocalSandbox:
         return pattern.sub(replace_match, content)
 
     def _resolve_and_secure(self, path: str) -> Path:
-        """Resolve path and ensure it lies within the workspace."""
+        """Resolve a path (virtual or relative) and ensure it lies within an allowed root.
+
+        Virtual paths (e.g. /workspace, /user_skill, /proj_skill) are resolved via the
+        path mappings and validated against their mapped local roots. Relative
+        paths are treated as workspace-relative and secured against the workspace.
+        """
+        resolved_str = self._resolve_path(path)
+        if resolved_str != path:
+            # Path matched a virtual mapping — validate against mapped roots.
+            resolved = Path(resolved_str).resolve()
+            for mapping in self.path_mappings:
+                local = Path(mapping.local_path).resolve()
+                if resolved == local or resolved.is_relative_to(local):
+                    return resolved
+            raise PermissionError(
+                errno.EACCES, "Path outside allowed roots", path
+            )
+        # Relative path — secure against the workspace root.
         target = self.workspace / path
         resolved = target.resolve()
         if not resolved.is_relative_to(self.workspace):

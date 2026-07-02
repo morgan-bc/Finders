@@ -24,6 +24,22 @@ def sandbox_with_readonly(tmp_path):
     return LocalSandbox(ws, path_mappings=mappings)
 
 
+@pytest.fixture
+def sandbox_with_skills(tmp_path):
+    """Sandbox with /user_skill (user skills, read-write) and /proj_skill (project skills, read-write) mappings."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    user_skill_dir = tmp_path / "user" / ".finders" / "skills"
+    user_skill_dir.mkdir(parents=True)
+    (user_skill_dir / "code-review" / "SKILL.md").parent.mkdir(parents=True)
+    (user_skill_dir / "code-review" / "SKILL.md").write_text("# code-review", encoding="utf-8")
+    project_skill_dir = tmp_path / "project" / ".finders" / "skills"
+    project_skill_dir.mkdir(parents=True)
+    (project_skill_dir / "web-research" / "SKILL.md").parent.mkdir(parents=True)
+    (project_skill_dir / "web-research" / "SKILL.md").write_text("# web-research", encoding="utf-8")
+    return LocalSandbox(ws, user_skill_dir=user_skill_dir, project_skill_dir=project_skill_dir)
+
+
 def test_read_file_success(sandbox):
     target = sandbox.workspace / "test.txt"
     target.write_text("hello world", encoding="utf-8")
@@ -250,3 +266,74 @@ def test_read_only_edit_file(sandbox_with_readonly):
     with pytest.raises(OSError):
         # The path resolves through the readonly mapping
         sb.edit_file("../readonly/reference.txt", "original", "modified")
+
+
+# --- /user_skill and /proj_skill virtual path tests ---
+
+def test_skill_mappings_created(sandbox_with_skills):
+    """Sandbox should have /workspace, /user_skill, and /proj_skill mappings."""
+    containers = [m.container_path for m in sandbox_with_skills.path_mappings]
+    assert "/workspace" in containers
+    assert "/user_skill" in containers
+    assert "/proj_skill" in containers
+    user_mapping = next(m for m in sandbox_with_skills.path_mappings if m.container_path == "/user_skill")
+    proj_mapping = next(m for m in sandbox_with_skills.path_mappings if m.container_path == "/proj_skill")
+    assert user_mapping.read_only is False
+    assert proj_mapping.read_only is False
+
+
+def test_read_project_skill_via_virtual_path(sandbox_with_skills):
+    """read_file should resolve /proj_skill/<skill>/SKILL.md to the project skills dir."""
+    content = sandbox_with_skills.read_file("/proj_skill/web-research/SKILL.md")
+    assert "# web-research" in content
+
+
+def test_read_user_skill_via_virtual_path(sandbox_with_skills):
+    """read_file should resolve /user_skill/<skill>/SKILL.md to the user skills dir."""
+    content = sandbox_with_skills.read_file("/user_skill/code-review/SKILL.md")
+    assert "# code-review" in content
+
+
+def test_read_workspace_via_virtual_path(sandbox_with_skills):
+    """read_file should resolve /workspace/... to the workspace dir."""
+    (sandbox_with_skills.workspace / "note.txt").write_text("hello", encoding="utf-8")
+    assert sandbox_with_skills.read_file("/workspace/note.txt") == "hello"
+
+
+def test_write_to_proj_skill_succeeds(sandbox_with_skills):
+    """Writing to /proj_skill (read-write) should succeed."""
+    sandbox_with_skills.write_file("/proj_skill/new.txt", "ok")
+    assert sandbox_with_skills.read_file("/proj_skill/new.txt") == "ok"
+
+
+def test_write_to_user_skill_succeeds(sandbox_with_skills):
+    """Writing to /user_skill (read-write) should succeed."""
+    sandbox_with_skills.write_file("/user_skill/new.txt", "ok")
+    assert sandbox_with_skills.read_file("/user_skill/new.txt") == "ok"
+
+
+def test_proj_skill_traversal_blocked(sandbox_with_skills):
+    """Traversal via /proj_skill/../.. should be blocked."""
+    with pytest.raises(PermissionError):
+        sandbox_with_skills.read_file("/proj_skill/../../etc/passwd")
+
+
+def test_user_skill_traversal_blocked(sandbox_with_skills):
+    """Traversal via /user_skill/../.. should be blocked."""
+    with pytest.raises(PermissionError):
+        sandbox_with_skills.read_file("/user_skill/../../etc/passwd")
+
+
+def test_workspace_virtual_path_still_secured(sandbox_with_skills):
+    """Traversal via /workspace/.. should be blocked."""
+    with pytest.raises(PermissionError):
+        sandbox_with_skills.read_file("/workspace/../outside.txt")
+
+
+def test_finders_workspace_env_var(monkeypatch, tmp_path):
+    """Sandbox should read FINDERS_WORKSPACE from env when workspace is None."""
+    ws = tmp_path / "env_workspace"
+    monkeypatch.setenv("FINDERS_WORKSPACE", str(ws))
+    sb = LocalSandbox()
+    assert sb.workspace == ws.resolve()
+    assert sb.workspace.exists()
