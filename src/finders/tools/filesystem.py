@@ -9,10 +9,11 @@ from finders.utils.config import get_settings
 
 
 _settings = get_settings()
+_workspace = _settings.get_workspace_path()
 _sandbox = LocalSandbox(
-    _settings.get_workspace_path(),
-    user_skill_dir=Path.home() / ".finders" / "skills",
-    project_skill_dir=Path.cwd() / ".finders" / "skills",
+    _workspace,
+    user_skill_dir=_workspace / "skills",
+    project_skill_dir=Path.cwd() / "skills",
 )
 
 
