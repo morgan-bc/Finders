@@ -28,7 +28,7 @@ def _build_middleware(settings: Settings, allowed_skills: list[str] | None = Non
     return [
         SkillsMiddleware(
             skills_dir=Path.home() / ".finders" / "skills",
-            project_skills_dir=Path.cwd() / ".finders" / "skills",
+            project_skills_dir=settings.get_project_dir() / "skills",
             allowed=allowed_skills,
             disallowed=disallowed_skills,
         ),

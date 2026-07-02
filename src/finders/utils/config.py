@@ -54,6 +54,8 @@ class Settings(BaseSettings):
 
     # Workspace
     finders_workspace: Optional[str] = None
+    # Project directory (Finders 项目代码根路径)
+    finders_project_dir: Optional[str] = None
 
     # Sub-configs
     agent: AgentConfig = Field(default_factory=AgentConfig)
@@ -79,6 +81,16 @@ class Settings(BaseSettings):
         if self.finders_workspace:
             return Path(self.finders_workspace).expanduser().resolve()
         return Path.home() / ".finders" / "workspace"
+
+    def get_project_dir(self) -> Path:
+        """Get the Finders project root directory.
+
+        Uses FINDERS_PROJECT_DIR env var if set, otherwise defaults to
+        ~/.finders/project.
+        """
+        if self.finders_project_dir:
+            return Path(self.finders_project_dir).expanduser().resolve()
+        return Path.home() / ".finders" / "project"
 
     def create_chat_model(self, model_name: str | None = None, fast: bool = False):
         """Create a ChatOpenAI model instance using LLM_API_KEY and LLM_API_BASE.
