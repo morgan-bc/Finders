@@ -33,7 +33,7 @@ class ToolConfig(BaseModel):
 
     web_search_provider: str = Field(default="tavily", description="tavily | exa")
     max_concurrency: int = Field(default=10, ge=1)
-    max_calls_per_tool: int = Field(default=3, ge=1)
+    max_calls_per_tool: int = Field(default=20, ge=1)
 
 
 class Settings(BaseSettings):
