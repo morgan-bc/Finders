@@ -44,7 +44,8 @@ class Settings(BaseSettings):
     # LLM
     llm_api_key: Optional[str] = None
     llm_api_base: Optional[str] = None
-    llm_model: Optional[str] = None
+    base_model: Optional[str] = None
+    fast_model: Optional[str] = None
 
     # Search
     tavily_api_key: Optional[str] = None
@@ -65,12 +66,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _apply_llm_config(self) -> Self:
-        """Apply LLM_MODEL env var to override default model name."""
-        if self.llm_model:
+        """Apply BASE_MODEL and FAST_MODEL env vars to override default model names."""
+        if self.base_model:
             if self.agent.model == "deepseek-v4-flash":
-                self.agent.model = self.llm_model
+                self.agent.model = self.base_model
+        if self.fast_model:
             if self.agent.fast_model == "deepseek-v4-flash":
-                self.agent.fast_model = self.llm_model
+                self.agent.fast_model = self.fast_model
         return self
 
     def get_workspace_path(self) -> Path:
