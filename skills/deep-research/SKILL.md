@@ -168,3 +168,48 @@ After completing research, you should have:
 5. Current trends and relevant context
 
 **Only then proceed to content generation**, using the gathered information to create high-quality, well-informed content.
+
+## Citation & References
+
+**Every piece of data, statistic, fact, or claim sourced from the web MUST be cited inline using markdown footnote references.**
+
+### Inline Citation Rules
+
+1. **Append a reference number at the end of each sentence** (before the period) that contains sourced data, statistics, facts, or claims.
+2. Reference numbers use the format `[^x]` where `x` is a sequential integer starting from 1.
+3. Each unique source gets its own number. If the same source is cited multiple times, reuse the same number.
+4. Place the reference marker **before the period/punctuation** at the end of the sentence.
+
+**Example:**
+
+> 比亚迪2025年全年累计销售新能源汽车427.21万辆，同比增长41.2%[^1]。其中，纯电动车销量约为176.5万辆，首次超越特斯拉成为全球纯电动汽车销量冠军[^2]。
+
+### References Section
+
+At the **end of your output**, include a "参考资料" (References) section listing all cited sources in the following format:
+
+```
+## 参考资料
+
+[^1]: (比亚迪2025年销量数据-懂车帝)[https://www.dongchedi.com/example1]
+[^2]: (全球纯电动车销量排名-汽车之家)[https://www.autohome.com.cn/example2]
+[^3]: (新能源汽车行业分析报告-中信证券)[https://www.citics.com/example3]
+```
+
+**Format specification:**
+- Each entry starts with `[^x]:` matching the inline reference number
+- Followed by a space and the source title in parentheses: `(标题-来源名称)`
+- Immediately followed by the URL in square brackets: `[https://...]`
+- Sources should be listed in numerical order
+- The title should be descriptive and include the source name (website, publication, organization, etc.)
+
+### When to Cite
+
+| Content Type | Cite? | Example |
+|---|---|---|
+| Specific numbers / statistics | **Yes** | "销量达到427万辆[^1]" |
+| Direct quotes or paraphrased claims | **Yes** | "专家指出……[^2]" |
+| Facts from a specific source | **Yes** | "该公司成立于2003年[^3]" |
+| Data from reports / studies | **Yes** | "根据麦肯锡报告[^4]" |
+| Common knowledge / general knowledge | No | "地球绕太阳公转" |
+| Your own analysis / synthesis | No | "综合来看……" |
