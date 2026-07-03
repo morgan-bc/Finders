@@ -27,6 +27,7 @@ class SubagentConfig:
     disallowed_tools: list[str] = field(default_factory=lambda: ["task"])
     model: str = "inherit"
     max_turns: int = 50
+    max_calls_per_tool: int = 20
     timeout_seconds: int = 900
     allowed_skills: list[str] | None = None
     disallowed_skills: list[str] | None = None

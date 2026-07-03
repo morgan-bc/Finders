@@ -40,4 +40,5 @@ Do NOT use for simple factual lookups that a single search can answer.""",
     disallowed_tools=["task"],  # Prevent nesting
     model="inherit",
     max_turns=50,
+    max_calls_per_tool=50,
 )

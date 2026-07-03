@@ -20,7 +20,7 @@ from finders.skills.middleware import SkillsMiddleware
 from finders.middlewares.dynamic_context import DynamicContextMiddleware
 
 
-def _build_middleware(settings: Settings, allowed_skills: list[str] | None = None, disallowed_skills: list[str] | None = None):
+def _build_middleware(settings: Settings, allowed_skills: list[str] | None = None, disallowed_skills: list[str] | None = None, max_calls_per_tool: int | None = None):
     """Build middleware pipeline for agent."""
     model = settings.create_chat_model()
     fast_model = settings.create_chat_model(fast=True)
@@ -40,7 +40,7 @@ def _build_middleware(settings: Settings, allowed_skills: list[str] | None = Non
         ),
         ContextEditingMiddleware(),
         ToolCallLimitMiddleware(
-            run_limit=settings.tools.max_calls_per_tool,
+            run_limit=max_calls_per_tool if max_calls_per_tool is not None else settings.tools.max_calls_per_tool,
         ),
         ToolRetryMiddleware(
             max_retries=2,
@@ -78,4 +78,5 @@ def create_finders_agent(settings: Settings):
         tools=tools,
         system_prompt=system_prompt,
         middleware=middleware,
+        recursion_limit=settings.agent.recursion_limit,
     )

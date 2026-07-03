@@ -11,6 +11,7 @@ class AgentConfig(BaseModel):
     model: str = Field(default="deepseek-v4-flash", description="LLM 模型名称")
     fast_model: str = Field(default="deepseek-v4-flash", description="快速模型（用于压缩等辅助任务）")
     max_iterations: int = Field(default=10, ge=1, le=50)
+    recursion_limit: int = Field(default=100, ge=1, le=1000, description="Agent 递归调用限制")
     compact_threshold: int = Field(default=100_000, description="触发压缩的 token 阈值")
     enable_todo: bool = Field(default=True, description="启用 TODO 任务清单（分解复杂任务）")
 
@@ -32,7 +33,7 @@ class ToolConfig(BaseModel):
 
     web_search_provider: str = Field(default="tavily", description="tavily | exa")
     max_concurrency: int = Field(default=10, ge=1)
-    max_calls_per_tool: int = Field(default=3, ge=1)
+    max_calls_per_tool: int = Field(default=20, ge=1)
 
 
 class Settings(BaseSettings):
@@ -43,7 +44,8 @@ class Settings(BaseSettings):
     # LLM
     llm_api_key: Optional[str] = None
     llm_api_base: Optional[str] = None
-    llm_model: Optional[str] = None
+    base_model: Optional[str] = None
+    fast_model: Optional[str] = None
 
     # Search
     tavily_api_key: Optional[str] = None
@@ -64,12 +66,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _apply_llm_config(self) -> Self:
-        """Apply LLM_MODEL env var to override default model name."""
-        if self.llm_model:
+        """Apply BASE_MODEL and FAST_MODEL env vars to override default model names."""
+        if self.base_model:
             if self.agent.model == "deepseek-v4-flash":
-                self.agent.model = self.llm_model
+                self.agent.model = self.base_model
+        if self.fast_model:
             if self.agent.fast_model == "deepseek-v4-flash":
-                self.agent.fast_model = self.llm_model
+                self.agent.fast_model = self.fast_model
         return self
 
     def get_workspace_path(self) -> Path:
