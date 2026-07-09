@@ -7,7 +7,7 @@ import pandas as pd
 import akshare as ak
 
 sys.path.insert(0, str(Path(__file__).parent))
-from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger
+from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger, get_data_dir
 
 logger = setup_logger(__name__)
 
@@ -24,7 +24,7 @@ def get_fundamentals(stock_code: str, output_dir: Path = None) -> dict:
         包含所有基本面数据的字典
     """
     if output_dir is None:
-        output_dir = Path('skills/company-fundamentals/data')
+        output_dir = get_data_dir()
     
     stock_info = validate_stock_code(stock_code)
     logger.info(f"正在获取 {stock_info['name']} ({stock_code}) 的基本面数据")
@@ -224,8 +224,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='获取公司基本面数据')
     parser.add_argument('stock_code', help='股票代码（如 600519）')
     parser.add_argument('--output-dir', type=Path,
-                       default=Path('skills/company-fundamentals/data'),
-                       help='输出目录')
+                       default=None,
+                       help='输出目录（默认：FINDERS_WORKSPACE/data）')
     args = parser.parse_args()
     
     get_fundamentals(args.stock_code, args.output_dir)

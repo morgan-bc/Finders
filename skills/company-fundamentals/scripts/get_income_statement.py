@@ -7,7 +7,7 @@ import pandas as pd
 import akshare as ak
 
 sys.path.insert(0, str(Path(__file__).parent))
-from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger
+from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger, get_data_dir
 
 logger = setup_logger(__name__)
 
@@ -25,7 +25,7 @@ def get_income_statement(stock_code: str, years: int = 5, output_dir: Path = Non
         包含4个数据集的字典
     """
     if output_dir is None:
-        output_dir = Path('skills/company-fundamentals/data')
+        output_dir = get_data_dir()
     
     stock_info = validate_stock_code(stock_code)
     logger.info(f"正在获取 {stock_info['name']} ({stock_code}) 的利润表，{years} 年")
@@ -122,8 +122,8 @@ if __name__ == '__main__':
     parser.add_argument('stock_code', help='股票代码（如 600519）')
     parser.add_argument('--years', type=int, default=5, help='年数（默认: 5）')
     parser.add_argument('--output-dir', type=Path,
-                       default=Path('skills/company-fundamentals/data'),
-                       help='输出目录')
+                       default=None,
+                       help='输出目录（默认：FINDERS_WORKSPACE/data）')
     args = parser.parse_args()
     
     get_income_statement(args.stock_code, args.years, args.output_dir)

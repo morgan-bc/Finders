@@ -1,11 +1,32 @@
 """共享工具模块：验证、数据获取、清洗、JSON I/O、日志"""
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Callable, Any
 import pandas as pd
 import akshare as ak
+
+
+def get_data_dir() -> Path:
+    """
+    获取数据存储目录。
+    
+    优先使用 FINDERS_WORKSPACE 环境变量，默认为 ~/.finders/workspace
+    
+    Returns:
+        Path: 数据目录路径 (FINDERS_WORKSPACE/data)
+    """
+    workspace = os.environ.get("FINDERS_WORKSPACE")
+    if workspace:
+        base_dir = Path(workspace).expanduser().resolve()
+    else:
+        base_dir = Path.home() / ".finders" / "workspace"
+    
+    data_dir = base_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 def validate_stock_code(stock_code: str) -> dict:
