@@ -129,8 +129,8 @@ python skills/company-fundamentals/scripts/get_income_statement.py <股票代码
 
 6. **价格与交易数据**
    - 当前股价
-   - 52周最高/最低价
-   - 50日/200日均线
+   - 1年最高/最低价
+   - 60日/180日均线
 
 7. **关键指标汇总表**
    - Markdown 表格，包含所有关键财务指标

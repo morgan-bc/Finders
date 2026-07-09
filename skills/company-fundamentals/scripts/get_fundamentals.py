@@ -93,8 +93,8 @@ def get_fundamentals(stock_code: str, output_dir: Path = None) -> dict:
             result['valuation']['price_to_book'] = _safe_float(r.get('市净率'))
             result['company_profile']['market_cap'] = _safe_float(r.get('总市值'))
             result['price_range']['current_price'] = _safe_float(r.get('最新价'))
-            result['price_range']['week_52_high'] = _safe_float(r.get('52最高'))
-            result['price_range']['week_52_low'] = _safe_float(r.get('52最低'))
+            result['price_range']['year_1_high'] = _safe_float(r.get('52最高'))
+            result['price_range']['year_1_low'] = _safe_float(r.get('52最低'))
             result['price_range']['day_60_average'] = _safe_float(r.get('60日涨跌幅'))
     except Exception as e:
         logger.error(f"获取实时行情失败: {e}")
@@ -109,12 +109,12 @@ def get_fundamentals(stock_code: str, output_dir: Path = None) -> dict:
         )
         if not price_data.empty:
             close = price_data['收盘'].astype(float)
-            result['price_range']['day_50_average'] = round(float(close.tail(50).mean()), 2)
-            result['price_range']['day_200_average'] = round(float(close.tail(200).mean()), 2)
+            result['price_range']['day_60_average'] = round(float(close.tail(60).mean()), 2)
+            result['price_range']['day_180_average'] = round(float(close.tail(180).mean()), 2)
             
-            recent_252 = close.tail(252)
-            result['price_range']['week_52_high'] = round(float(recent_252.max()), 2)
-            result['price_range']['week_52_low'] = round(float(recent_252.min()), 2)
+            recent_252 = close.tail(252)  # 约1年交易日
+            result['price_range']['year_1_high'] = round(float(recent_252.max()), 2)
+            result['price_range']['year_1_low'] = round(float(recent_252.min()), 2)
     except Exception as e:
         logger.error(f"获取历史价格失败: {e}")
     
