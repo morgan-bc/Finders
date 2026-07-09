@@ -26,3 +26,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Company fundamentals skill data output
+skills/company-fundamentals/data/*.json
