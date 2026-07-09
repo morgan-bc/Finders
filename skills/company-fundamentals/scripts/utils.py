@@ -1,46 +1,35 @@
-"""Shared utilities for company fundamentals analysis scripts."""
+"""共享工具模块：验证、数据获取、清洗、JSON I/O、日志"""
 import json
 import logging
 import time
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
-
-import akshare as ak
+from typing import Callable, Any
 import pandas as pd
+import akshare as ak
 
 
 def validate_stock_code(stock_code: str) -> dict:
     """
-    Validate stock code via akshare.
-
+    验证股票代码并返回公司信息。
+    
     Args:
-        stock_code: Stock code to validate (e.g., '600519')
-
+        stock_code: 6位股票代码（如 '600519'）
+    
     Returns:
-        dict with keys: code, name, market
-
+        dict: 包含 code, name, market 的字典
+        
     Raises:
-        ValueError: If stock code is invalid
+        ValueError: 当股票代码无效时
     """
-    stock_list = ak.stock_info_a_code_name()
-
-    # Find the stock in the list
-    match = stock_list[stock_list['code'] == stock_code]
-
-    if match.empty:
-        raise ValueError(f"Invalid stock code: {stock_code}")
-
-    stock_name = match.iloc[0]['name']
-
-    # Determine market based on code prefix
-    if stock_code.startswith('6'):
-        market = 'SH'
-    elif stock_code.startswith(('0', '3')):
-        market = 'SZ'
-    else:
-        market = 'OTHER'
-
+    stock_info = ak.stock_info_a_code_name()
+    stock_row = stock_info[stock_info['code'] == stock_code]
+    
+    if stock_row.empty:
+        raise ValueError(f"股票代码 '{stock_code}' 在A股市场中不存在")
+    
+    stock_name = stock_row.iloc[0]['name']
+    market = 'SH' if stock_code.startswith('6') else 'SZ'
+    
     return {
         'code': stock_code,
         'name': stock_name,
@@ -50,124 +39,94 @@ def validate_stock_code(stock_code: str) -> dict:
 
 def save_json(data: dict, filepath: Path) -> None:
     """
-    Save data as JSON with proper encoding.
-
+    保存数据为 JSON 文件（UTF-8 编码）。
+    
     Args:
-        data: Dictionary to save
-        filepath: Path to save the JSON file
+        data: 要保存的字典
+        filepath: 输出文件路径
     """
-    filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
-
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def fetch_with_retry(func: Callable, max_retries: int = 3, **kwargs) -> Any:
     """
-    Fetch data with exponential backoff retry.
-
+    执行函数，带重试逻辑和指数退避。
+    
     Args:
-        func: Function to call
-        max_retries: Maximum number of retry attempts (default: 3)
-        **kwargs: Arguments to pass to the function
-
+        func: 要执行的函数
+        max_retries: 最大重试次数
+        **kwargs: 传递给函数的参数
+    
     Returns:
-        Result from the function call
-
+        函数返回值
+        
     Raises:
-        Exception: If all retries fail
+        Exception: 如果所有重试都失败
     """
     last_exception = None
-
+    
     for attempt in range(max_retries):
         try:
             return func(**kwargs)
         except Exception as e:
             last_exception = e
             if attempt < max_retries - 1:
-                # Exponential backoff: 1s, 2s, 4s
-                sleep_time = 2 ** attempt
+                sleep_time = 2 ** attempt  # 1s, 2s, 4s
+                logging.warning(f"第 {attempt + 1} 次尝试失败: {e}。{sleep_time}秒后重试...")
                 time.sleep(sleep_time)
-
+    
     raise last_exception
-
-
-def _parse_date(value: str) -> str | None:
-    """Try to parse a date string in multiple formats, return YYYY-MM-DD or None."""
-    if not isinstance(value, str):
-        return None
-    for fmt in ('%Y-%m-%d', '%Y/%m/%d', '%Y%m%d', '%Y-%m-%d %H:%M:%S'):
-        try:
-            return datetime.strptime(value, fmt).strftime('%Y-%m-%d')
-        except (ValueError, TypeError):
-            continue
-    return None
 
 
 def clean_financial_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clean financial data for JSON serialization.
-
-    - Convert NaN to None
-    - Standardize date formats to YYYY-MM-DD
-
+    清洗财务数据以便 JSON 序列化。
+    
+    - 将 NaN 转换为 None
+    - 标准化日期格式
+    - 确保数值类型
+    
     Args:
-        df: DataFrame to clean
-
+        df: 要清洗的 DataFrame
+    
     Returns:
-        Cleaned DataFrame
+        清洗后的 DataFrame
     """
     df = df.copy()
-
-    # Standardize date columns: detect columns that look like dates
-    for col in df.columns:
-        if df[col].dtype == 'object' or str(df[col].dtype) == 'str':
-            # Check if most non-null values look like dates
-            sample = df[col].dropna().head(5)
-            if sample.empty:
-                continue
-            date_like_count = sum(
-                1 for v in sample
-                if isinstance(v, str) and len(v) >= 8 and v.replace('-', '').replace('/', '').isdigit()
-            )
-            if date_like_count > len(sample) / 2:
-                df[col] = df[col].apply(_parse_date)
-
-    # Convert to object dtype and replace NaN/NaT with None
-    df = df.astype(object).where(pd.notnull(df), None)
-
+    
+    # 将 NaN 转换为 None 以便 JSON 序列化
+    df = df.where(pd.notnull(df), None)
+    
+    # 将日期列转换为字符串格式
+    date_cols = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d')
+    
     return df
 
 
 def setup_logger(script_name: str) -> logging.Logger:
     """
-    Setup logger with unified format.
-
+    设置日志记录器，使用一致的格式。
+    
     Args:
-        script_name: Name of the script (used as logger name)
-
+        script_name: 脚本/模块名称
+    
     Returns:
-        Configured logger instance
+        配置好的日志记录器
     """
     logger = logging.getLogger(script_name)
     logger.setLevel(logging.INFO)
-
-    # Remove existing handlers to avoid duplicates
-    logger.handlers.clear()
-
-    # Create console handler
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
-
-    # Create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    handler.setFormatter(formatter)
-
-    # Add handler to logger
-    logger.addHandler(handler)
-
+    
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+    
     return logger
