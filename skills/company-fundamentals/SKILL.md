@@ -61,36 +61,23 @@ python skills/company-fundamentals/scripts/get_fundamentals.py <股票代码>
 
 **资产负债表分析：**
 ```bash
-python skills/company-fundamentals/scripts/get_balance_sheet.py <股票代码> --years 5
+python skills/company-fundamentals/scripts/get_balance_sheet.py <股票代码> --years 5 --frequency both
 ```
-
-需要分析以下情况时使用：
-- 资产构成和质量
-- 债务结构和到期情况
-- 营运资金管理
-- 财务杠杆趋势
 
 **现金流量表分析：**
 ```bash
-python skills/company-fundamentals/scripts/get_cashflow.py <股票代码> --years 5
+python skills/company-fundamentals/scripts/get_cashflow.py <股票代码> --years 5 --frequency both
 ```
-
-需要分析以下情况时使用：
-- 经营现金流质量
-- 资本支出模式
-- 自由现金流生成
-- 现金流可持续性
 
 **利润表分析：**
 ```bash
-python skills/company-fundamentals/scripts/get_income_statement.py <股票代码> --years 5
+python skills/company-fundamentals/scripts/get_income_statement.py <股票代码> --years 5 --frequency both
 ```
 
-需要分析以下情况时使用：
-- 收入增长趋势
-- 成本结构和利润率
-- 利润质量和可持续性
-- 每股收益趋势
+**`--frequency` 参数说明：**
+- `yearly` - 仅获取年度数据（每年12月31日的报告）
+- `quarterly` - 仅获取季度数据（所有报告期）
+- `both` - 同时获取年度和季度数据（默认）
 
 ### 步骤 3：生成分析报告
 
