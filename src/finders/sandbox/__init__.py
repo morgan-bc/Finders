@@ -2,7 +2,6 @@
 
 from finders.sandbox.sandbox import (
     LocalSandbox,
-    PathMapping,
     GrepMatch,
     IGNORE_PATTERNS,
     DEFAULT_MAX_FILE_SIZE_BYTES,
@@ -19,7 +18,6 @@ from finders.sandbox.sandbox import (
 
 __all__ = [
     "LocalSandbox",
-    "PathMapping",
     "GrepMatch",
     "IGNORE_PATTERNS",
     "DEFAULT_MAX_FILE_SIZE_BYTES",

@@ -6,9 +6,8 @@ import os
 import re
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Optional
 
 IGNORE_PATTERNS = [
     ".git",
@@ -17,8 +16,6 @@ IGNORE_PATTERNS = [
     ".bzr",
     "node_modules",
     "__pycache__",
-    ".venv",
-    "venv",
     ".env",
     "env",
     ".tox",
@@ -64,15 +61,6 @@ IGNORE_PATTERNS = [
 
 DEFAULT_MAX_FILE_SIZE_BYTES = 1_000_000
 DEFAULT_LINE_SUMMARY_LENGTH = 200
-
-
-@dataclass(frozen=True)
-class PathMapping:
-    """A path mapping from a container path to a local path with optional read-only flag."""
-
-    container_path: str
-    local_path: str
-    read_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -256,10 +244,10 @@ def list_dir(path: str, max_depth: int = 2) -> list[str]:
 
 
 class LocalSandbox:
-    """Local sandbox restricting file operations to a workspace directory.
+    """Local sandbox using real filesystem paths.
 
-    Supports path mappings between container paths (seen by the agent) and local
-    filesystem paths. All operations are restricted to mapped paths for security.
+    Write operations (write_file, edit_file) are restricted to workspace,
+    user_skill_dir, and project_skill_dir. All other paths are read-only.
     """
 
     def __init__(
@@ -267,7 +255,6 @@ class LocalSandbox:
         workspace: Path | None = None,
         user_skill_dir: Path | None = None,
         project_skill_dir: Path | None = None,
-        path_mappings: Optional[list[PathMapping]] = None,
     ):
         if workspace is None:
             ws_env = os.environ.get("FINDERS_WORKSPACE")
@@ -275,256 +262,69 @@ class LocalSandbox:
         self.workspace = Path(workspace).expanduser().resolve()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
-        # Default mapping: /workspace -> actual workspace directory (read-write)
-        mappings = [PathMapping("/workspace", str(self.workspace))]
+        self.user_skill_dir = Path(user_skill_dir).expanduser().resolve() if user_skill_dir else None
+        self.project_skill_dir = Path(project_skill_dir).expanduser().resolve() if project_skill_dir else None
 
-        # /user_skill -> user-level skills directory (read-write)
-        if user_skill_dir is not None:
-            user_resolved = Path(user_skill_dir).expanduser().resolve()
-            mappings.append(PathMapping("/user_skill", str(user_resolved)))
+        # Build list of allowed write roots
+        self._allowed_write_roots: list[Path] = [self.workspace]
+        if self.user_skill_dir is not None:
+            self._allowed_write_roots.append(self.user_skill_dir)
+        if self.project_skill_dir is not None:
+            self._allowed_write_roots.append(self.project_skill_dir)
 
-        # /proj_skill -> project-level skills directory (read-write)
-        if project_skill_dir is not None:
-            project_resolved = Path(project_skill_dir).expanduser().resolve()
-            mappings.append(PathMapping("/proj_skill", str(project_resolved)))
+    def _is_writable(self, resolved_path: Path) -> bool:
+        """Check if a resolved path is under an allowed write root."""
+        for root in self._allowed_write_roots:
+            if resolved_path == root or resolved_path.is_relative_to(root):
+                return True
+        return False
 
-        if path_mappings:
-            mappings.extend(path_mappings)
-        self.path_mappings = mappings
+    def _resolve_path(self, path: str) -> Path:
+        """Resolve a path to an absolute real path.
 
-        # Track files written through write_file so read_file can reverse-resolve
-        # paths in agent-authored content.
-        self._agent_written_paths: set[str] = set()
-
-    def _is_read_only_path(self, resolved_path: str) -> bool:
-        """Check if a resolved path is under a read-only mapping.
-
-        When multiple mappings match (nested mounts), prefer the most specific
-        mapping (i.e. the one whose local_path is the longest prefix of the
-        resolved path).
+        Relative paths are treated as workspace-relative.
+        Absolute paths are used directly.
         """
-        resolved = str(Path(resolved_path).resolve())
-
-        best_mapping: Optional[PathMapping] = None
-        best_prefix_len = -1
-
-        for mapping in self.path_mappings:
-            local_resolved = str(Path(mapping.local_path).resolve())
-            if resolved == local_resolved or resolved.startswith(local_resolved + os.sep):
-                prefix_len = len(local_resolved)
-                if prefix_len > best_prefix_len:
-                    best_prefix_len = prefix_len
-                    best_mapping = mapping
-
-        if best_mapping is None:
-            return False
-
-        return best_mapping.read_only
-
-    def _resolve_path(self, path: str) -> str:
-        """Resolve container path to actual local path using mappings.
-
-        Args:
-            path: Path that might be a container path
-
-        Returns:
-            Resolved local path
-        """
-        path_str = str(path)
-
-        # Try each mapping (longest prefix first for more specific matches)
-        for mapping in sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True):
-            container_path = mapping.container_path
-            local_path = mapping.local_path
-            if path_str == container_path or path_str.startswith(container_path + "/"):
-                # Replace the container path prefix with local path
-                relative = path_str[len(container_path):].lstrip("/")
-                resolved = str(Path(local_path) / relative) if relative else local_path
-                return resolved
-
-        # No mapping found, return original path
-        return path_str
-
-    def _reverse_resolve_path(self, path: str) -> str:
-        """Reverse resolve local path back to container path using mappings.
-
-        Args:
-            path: Local path that might need to be mapped to container path
-
-        Returns:
-            Container path if mapping exists, otherwise original path
-        """
-        # Normalize to forward slashes and resolve
-        normalized_path = path.replace("\\", "/")
-        path_str = str(Path(normalized_path).resolve()).replace("\\", "/")
-
-        # Try each mapping (longest local path first for more specific matches)
-        for mapping in sorted(self.path_mappings, key=lambda m: len(m.local_path), reverse=True):
-            local_path_resolved = str(Path(mapping.local_path).resolve()).replace("\\", "/")
-            if path_str == local_path_resolved or path_str.startswith(local_path_resolved + "/"):
-                # Replace the local path prefix with container path
-                relative = path_str[len(local_path_resolved):].lstrip("/")
-                resolved = f"{mapping.container_path}/{relative}" if relative else mapping.container_path
-                return resolved
-
-        # No mapping found, return original path
-        return path_str
-
-    def _reverse_resolve_paths_in_output(self, output: str) -> str:
-        """Reverse resolve local paths back to container paths in output string.
-
-        Args:
-            output: Output string that may contain local paths
-
-        Returns:
-            Output with local paths resolved to container paths
-        """
-        sorted_mappings = sorted(self.path_mappings, key=lambda m: len(m.local_path), reverse=True)
-
-        if not sorted_mappings:
-            return output
-
-        result = output
-        for mapping in sorted_mappings:
-            # Get resolved local path and create pattern that matches both
-            # forward and backslash separators (Windows compatibility)
-            local_resolved = str(Path(mapping.local_path).resolve())
-            # Escape the path, then replace escaped backslashes with a pattern
-            # that matches either separator
-            escaped_local = re.escape(local_resolved).replace("\\\\", r"[\\/]")
-            # Match path followed by optional path components with either separator
-            pattern = re.compile(escaped_local + r"(?:[\\/][^\s\"';&|<>()]*)?")
-
-            def replace_match(match: re.Match) -> str:
-                matched_path = match.group(0).replace("\\", "/")
-                return self._reverse_resolve_path(matched_path)
-
-            result = pattern.sub(replace_match, result)
-
-        return result
-
-    def _resolve_paths_in_command(self, command: str) -> str:
-        """Resolve container paths to local paths in a command string.
-
-        Args:
-            command: Command string that may contain container paths
-
-        Returns:
-            Command with container paths resolved to local paths
-        """
-        sorted_mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
-
-        if not sorted_mappings:
-            return command
-
-        patterns = [
-            re.escape(m.container_path) + r"(?=/|$|[\s\"';&|<>()])(?:/[^\s\"';&|<>()]*)?"
-            for m in sorted_mappings
-        ]
-        pattern = re.compile("|".join(f"({p})" for p in patterns))
-
-        def replace_match(match: re.Match) -> str:
-            matched_path = match.group(0)
-            return self._resolve_path(matched_path)
-
-        return pattern.sub(replace_match, command)
-
-    def _resolve_paths_in_content(self, content: str) -> str:
-        """Resolve container paths to local paths in arbitrary file content.
-
-        Unlike `_resolve_paths_in_command` which uses shell-aware boundary
-        characters, this method treats the content as plain text and resolves
-        every occurrence of a container path prefix. Resolved paths are
-        normalized to forward slashes to avoid backslash-escape issues on
-        Windows hosts.
-
-        Args:
-            content: File content that may contain container paths.
-
-        Returns:
-            Content with container paths resolved to local paths (forward slashes).
-        """
-        sorted_mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
-        if not sorted_mappings:
-            return content
-
-        patterns = [
-            re.escape(m.container_path) + r"(?=/|$|[^\w./-])(?:/[^\s\"';&|<>()]*)?"
-            for m in sorted_mappings
-        ]
-        pattern = re.compile("|".join(f"({p})" for p in patterns))
-
-        def replace_match(match: re.Match) -> str:
-            matched_path = match.group(0)
-            resolved = self._resolve_path(matched_path)
-            return resolved.replace("\\", "/")
-
-        return pattern.sub(replace_match, content)
-
-    def _resolve_and_secure(self, path: str) -> Path:
-        """Resolve a path (virtual or relative) and ensure it lies within an allowed root.
-
-        Virtual paths (e.g. /workspace, /user_skill, /proj_skill) are resolved via the
-        path mappings and validated against their mapped local roots. Relative
-        paths are treated as workspace-relative and secured against the workspace.
-        """
-        resolved_str = self._resolve_path(path)
-        if resolved_str != path:
-            # Path matched a virtual mapping — validate against mapped roots.
-            resolved = Path(resolved_str).resolve()
-            for mapping in self.path_mappings:
-                local = Path(mapping.local_path).resolve()
-                if resolved == local or resolved.is_relative_to(local):
-                    return resolved
-            raise PermissionError(
-                errno.EACCES, "Path outside allowed roots", path
-            )
-        # Relative path — secure against the workspace root.
-        target = self.workspace / path
-        resolved = target.resolve()
-        if not resolved.is_relative_to(self.workspace):
-            raise PermissionError(
-                errno.EACCES, "Path outside workspace", path
-            )
+        p = Path(path)
+        if p.is_absolute():
+            resolved = p.resolve()
+        else:
+            resolved = (self.workspace / path).resolve()
         return resolved
 
     def read_file(self, path: str, max_chars: int = 20000) -> str:
-        """Read a file within the workspace."""
-        resolved = self._resolve_and_secure(path)
+        """Read a file. All paths are readable."""
+        resolved = self._resolve_path(path)
         if not resolved.exists():
             raise FileNotFoundError(errno.ENOENT, "File not found", path)
         if not resolved.is_file():
             raise IsADirectoryError(errno.EISDIR, "Is a directory", path)
         content = resolved.read_text(encoding="utf-8")
-        # Only reverse-resolve paths in files that were previously written
-        # by write_file (agent-authored content).
-        if str(resolved) in self._agent_written_paths:
-            content = self._reverse_resolve_paths_in_output(content)
         if len(content) > max_chars:
             return content[:max_chars] + "\n\n... [truncated]"
         return content
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
-        """Write content to a file within the workspace."""
-        resolved = self._resolve_and_secure(path)
-        if self._is_read_only_path(resolved):
-            raise OSError(errno.EROFS, "Read-only file system", path)
+        """Write content to a file. Restricted to allowed write directories."""
+        resolved = self._resolve_path(path)
+        if not self._is_writable(resolved):
+            raise PermissionError(
+                errno.EACCES, "Path is read-only, writes restricted to workspace and skill directories", path
+            )
         dir_path = resolved.parent
         if dir_path:
             dir_path.mkdir(parents=True, exist_ok=True)
-        # Resolve container paths in content to local paths
-        resolved_content = self._resolve_paths_in_content(content)
         mode = "a" if append else "w"
         with open(resolved, mode, encoding="utf-8") as f:
-            f.write(resolved_content)
-        # Track this path so read_file knows to reverse-resolve on read.
-        self._agent_written_paths.add(str(resolved))
+            f.write(content)
 
     def edit_file(self, path: str, old_string: str, new_string: str) -> None:
-        """Replace old_string with new_string in a file within the workspace."""
-        resolved = self._resolve_and_secure(path)
-        if self._is_read_only_path(resolved):
-            raise OSError(errno.EROFS, "Read-only file system", path)
+        """Replace old_string with new_string in a file. Restricted to allowed write directories."""
+        resolved = self._resolve_path(path)
+        if not self._is_writable(resolved):
+            raise PermissionError(
+                errno.EACCES, "Path is read-only, writes restricted to workspace and skill directories", path
+            )
         if not resolved.exists():
             raise FileNotFoundError(errno.ENOENT, "File not found", path)
         if not resolved.is_file():
@@ -534,27 +334,20 @@ class LocalSandbox:
             raise ValueError(f"old_string not found in file: {path}")
         content = content.replace(old_string, new_string, 1)
         resolved.write_text(content, encoding="utf-8")
-        # Track this path as agent-authored
-        self._agent_written_paths.add(str(resolved))
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
-        """List directory contents within the workspace."""
-        resolved = self._resolve_and_secure(path)
+        """List directory contents."""
+        resolved = self._resolve_path(path)
         if not resolved.is_dir():
             raise NotADirectoryError(errno.ENOTDIR, "Not a directory", path)
-        entries = list_dir(str(resolved), max_depth)
-        # Reverse resolve local paths back to container paths in output
-        return [self._reverse_resolve_paths_in_output(entry) for entry in entries]
+        return list_dir(str(resolved), max_depth)
 
     def glob(
         self, path: str, pattern: str, *, include_dirs: bool = False, max_results: int = 200
     ) -> tuple[list[str], bool]:
-        """Find paths matching a glob pattern under a directory in the workspace."""
-        resolved = self._resolve_and_secure(path)
-        matches, truncated = find_glob_matches(
-            resolved, pattern, include_dirs=include_dirs, max_results=max_results
-        )
-        return [self._reverse_resolve_path(match) for match in matches], truncated
+        """Find paths matching a glob pattern under a directory."""
+        resolved = self._resolve_path(path)
+        return find_glob_matches(resolved, pattern, include_dirs=include_dirs, max_results=max_results)
 
     def grep(
         self,
@@ -566,9 +359,9 @@ class LocalSandbox:
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
-        """Search for matches inside text files under a directory in the workspace."""
-        resolved = self._resolve_and_secure(path)
-        matches, truncated = find_grep_matches(
+        """Search for matches inside text files under a directory."""
+        resolved = self._resolve_path(path)
+        return find_grep_matches(
             resolved,
             pattern,
             glob_pattern=glob,
@@ -576,14 +369,6 @@ class LocalSandbox:
             case_sensitive=case_sensitive,
             max_results=max_results,
         )
-        return [
-            GrepMatch(
-                path=self._reverse_resolve_path(match.path),
-                line_number=match.line_number,
-                line=match.line,
-            )
-            for match in matches
-        ], truncated
 
     @staticmethod
     def _shell_name(shell: str) -> str:
@@ -635,22 +420,20 @@ class LocalSandbox:
 
     def execute(self, command: str, timeout: int = 600) -> str:
         """Execute a shell command and return its output."""
-        # Resolve container paths in command before execution
-        resolved_command = self._resolve_paths_in_command(command)
         shell = self._get_shell()
 
         if os.name == "nt":
             if self._is_powershell(shell):
-                args = [shell, "-NoProfile", "-Command", resolved_command]
+                args = [shell, "-NoProfile", "-Command", command]
             elif self._is_cmd_shell(shell):
-                args = [shell, "/c", resolved_command]
+                args = [shell, "/c", command]
             else:
-                args = [shell, "-c", resolved_command]
+                args = [shell, "-c", command]
             result = subprocess.run(
                 args, shell=False, capture_output=True, text=True, timeout=timeout
             )
         else:
-            args = [shell, "-c", resolved_command]
+            args = [shell, "-c", command]
             result = subprocess.run(
                 args, shell=False, capture_output=True, text=True, timeout=timeout
             )
@@ -661,6 +444,4 @@ class LocalSandbox:
         if result.returncode != 0:
             output += f"\nExit Code: {result.returncode}"
 
-        final_output = output if output else "(no output)"
-        # Reverse resolve local paths back to container paths in output
-        return self._reverse_resolve_paths_in_output(final_output)
+        return output if output else "(no output)"
