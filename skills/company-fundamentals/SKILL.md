@@ -137,7 +137,7 @@ python skills/company-fundamentals/scripts/get_income_statement.py <股票代码
 
 ## 数据文件位置
 
-所有中间数据保存在 `skills/company-fundamentals/data/` 目录：
+所有中间数据保存在 `$FINDERS_WORKSPACE/data/` 目录（通过环境变量 `FINDERS_WORKSPACE` 配置，默认 `~/.finders/workspace/data/`）：
 - `{股票代码}_fundamentals.json` - 综合基本面
 - `{股票代码}_balance_sheet_*.json` - 资产负债表数据（4个文件）
 - `{股票代码}_cashflow_*.json` - 现金流量表数据（4个文件）
