@@ -91,9 +91,13 @@ class Settings(BaseSettings):
         Uses FINDERS_PROJECT_DIR env var if set, otherwise defaults to
         ~/.finders/project.
         """
-        if self.finders_project_dir:
-            return Path(self.finders_project_dir).expanduser().resolve()
-        return Path.home() / ".finders" / "project"
+        if self.finders_project_dir is None:
+            self.finders_project_dir = str(Path(__file__).parent.parent.parent.parent.resolve())
+        return Path(self.finders_project_dir).expanduser().resolve()
+
+    def get_project_dir_str(self) -> str:
+        """Get the Finders project root directory as a string."""
+        return str(self.get_project_dir())
 
     def create_chat_model(self, model_name: str | None = None, fast: bool = False):
         """Create a ChatOpenAI model instance using LLM_API_KEY and LLM_API_BASE.

@@ -55,13 +55,7 @@ class SkillMetadata(TypedDict):
     path: str
     """Path to the SKILL.md file."""
 
-    source: str
-    """Source of the skill ('user' or 'project')."""
-
     # Optional fields per Agent Skills spec
-    license: NotRequired[str | None]
-    """License name or reference to bundled license file."""
-
     compatibility: NotRequired[str | None]
     """Environment requirements (max 500 chars)."""
 
@@ -125,12 +119,11 @@ def _validate_skill_name(name: str, directory_name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _parse_skill_metadata(skill_md_path: Path, source: str) -> SkillMetadata | None:
+def _parse_skill_metadata(skill_md_path: Path) -> SkillMetadata | None:
     """Parse YAML frontmatter from a SKILL.md file per Agent Skills spec.
 
     Args:
         skill_md_path: Path to the SKILL.md file.
-        source: Source of the skill ('user' or 'project').
 
     Returns:
         SkillMetadata with all fields, or None if parsing fails.
@@ -193,8 +186,6 @@ def _parse_skill_metadata(skill_md_path: Path, source: str) -> SkillMetadata | N
             name=str(name),
             description=description_str,
             path=str(skill_md_path),
-            source=source,
-            license=frontmatter_data.get("license"),
             compatibility=frontmatter_data.get("compatibility"),
             metadata=frontmatter_data.get("metadata"),
             allowed_tools=frontmatter_data.get("allowed-tools"),
@@ -205,7 +196,7 @@ def _parse_skill_metadata(skill_md_path: Path, source: str) -> SkillMetadata | N
         return None
 
 
-def _list_skills(skills_dir: Path, source: str) -> list[SkillMetadata]:
+def _list_skills(skills_dir: Path) -> list[SkillMetadata]:
     """List all skills from a single skills directory (internal helper).
 
     Scans the skills directory for subdirectories containing SKILL.md files,
@@ -213,10 +204,9 @@ def _list_skills(skills_dir: Path, source: str) -> list[SkillMetadata]:
 
     Args:
         skills_dir: Path to the skills directory.
-        source: Source of the skills ('user' or 'project').
 
     Returns:
-        List of skill metadata dictionaries with name, description, path, and source.
+        List of skill metadata dictionaries with name, description, and path.
     """
     skills_dir = skills_dir.expanduser()
     if not skills_dir.exists():
@@ -243,39 +233,32 @@ def _list_skills(skills_dir: Path, source: str) -> list[SkillMetadata]:
         if not _is_safe_path(skill_md_path, resolved_base):
             continue
 
-        metadata = _parse_skill_metadata(skill_md_path, source=source)
+        metadata = _parse_skill_metadata(skill_md_path)
         if metadata:
             skills.append(metadata)
 
     return skills
 
 
-def list_skills(
-    *, user_skills_dir: Path | None = None, project_skills_dir: Path | None = None
-) -> list[SkillMetadata]:
-    """List skills from user and/or project directories.
+def list_skills(skills_dirs: list[Path] | None = None) -> list[SkillMetadata]:
+    """List skills from multiple directories.
 
-    When both directories are provided, project skills with the same name as
-    user skills will override them.
+    Later directories override earlier ones when skill names conflict.
 
     Args:
-        user_skills_dir: Path to the user-level skills directory.
-        project_skills_dir: Path to the project-level skills directory.
+        skills_dirs: List of paths to skills directories.
 
     Returns:
-        Merged list of skill metadata from both sources, with project skills
-        taking precedence over user skills when names conflict.
+        Merged list of skill metadata, with later directories taking precedence.
     """
+    if not skills_dirs:
+        return []
+
     all_skills: dict[str, SkillMetadata] = {}
 
-    if user_skills_dir:
-        user_skills = _list_skills(user_skills_dir, source="user")
-        for skill in user_skills:
-            all_skills[skill["name"]] = skill
-
-    if project_skills_dir:
-        project_skills = _list_skills(project_skills_dir, source="project")
-        for skill in project_skills:
+    for skills_dir in skills_dirs:
+        dir_skills = _list_skills(skills_dir)
+        for skill in dir_skills:
             all_skills[skill["name"]] = skill
 
     return list(all_skills.values())

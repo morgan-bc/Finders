@@ -5,7 +5,7 @@ import logging
 from dataclasses import replace
 from typing import Annotated
 
-from langchain.tools import InjectedToolCallId, tool
+from langchain.tools import tool, ToolRuntime
 
 from finders.subagents import SubagentExecutor, get_available_subagent_names, get_subagent_config
 from finders.subagents.executor import SubagentStatus, cleanup_background_task, get_background_task_result
@@ -25,8 +25,7 @@ async def task_tool(
     description: str,
     prompt: str,
     subagent_type: str,
-    tool_call_id: Annotated[str, InjectedToolCallId],
-    max_turns: int | None = None,
+    runtime: ToolRuntime,
 ) -> str:
     """Delegate a task to a specialized subagent that runs in its own context.
 
@@ -53,7 +52,6 @@ async def task_tool(
         description: A short (3-5 word) description of the task. ALWAYS PROVIDE THIS PARAMETER FIRST.
         prompt: The task description for the subagent. Be specific and clear. ALWAYS PROVIDE THIS PARAMETER SECOND.
         subagent_type: The type of subagent to use. ALWAYS PROVIDE THIS PARAMETER THIRD.
-        max_turns: Optional maximum number of agent turns. Defaults to subagent's configured max.
     """
     available_subagent_names = get_available_subagent_names()
 
@@ -63,9 +61,6 @@ async def task_tool(
         return f"Error: Unknown subagent type '{subagent_type}'. Available: {available}"
 
     overrides: dict = {}
-    if max_turns is not None:
-        overrides["max_turns"] = max_turns
-
     if overrides:
         config = replace(config, **overrides)
 
@@ -78,9 +73,10 @@ async def task_tool(
         config=config,
         tools=tools,
         parent_model=parent_model,
+        skill_metadata=runtime.state.get("skill_metadata", None),
     )
 
-    task_id = executor.execute_async(prompt, task_id=tool_call_id)
+    task_id = executor.execute_async(prompt, task_id=runtime.tool_call_id)
 
     poll_count = 0
     last_status = None

@@ -29,3 +29,5 @@ Thumbs.db
 
 # Company fundamentals skill data output
 skills/company-fundamentals/data/*.json
+workdir/*
+output/*

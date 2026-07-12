@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from finders.agents.runner import AgentRunner
+from finders.agents.factory import create_finders_agent
 from finders.cli.tui import TUI
 from finders.utils.config import get_settings
 
@@ -13,6 +13,7 @@ def main() -> None:
     """CLI 入口点：交互式问答。"""
     settings = get_settings()
     tui = TUI()
+    agent = create_finders_agent(settings)
 
     tui.print_banner()
     tui.print_welcome()
@@ -36,8 +37,7 @@ def main() -> None:
                 tui.console.print(f"Model set to: {settings.agent.model}", style="cyan")
             continue
 
-        runner = AgentRunner(settings, query)
-        asyncio.run(tui.run_query(runner))
+        asyncio.run(tui.run_query(agent, query))
         tui.print_separator()
 
     tui.console.print("Goodbye!", style="dim")

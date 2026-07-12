@@ -1,15 +1,13 @@
 """CLI terminal UI for Finders."""
 from __future__ import annotations
 
-import asyncio
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.live import Live
 from rich.spinner import Spinner
-from rich.table import Table
 
-from finders.agents.runner import AgentRunner
+from langchain_core.messages import AIMessageChunk, ToolMessage
 
 
 class TUI:
@@ -17,7 +15,6 @@ class TUI:
 
     def __init__(self) -> None:
         self.console = Console()
-        self._thinking_msg = ""
 
     def print_banner(self) -> None:
         self.console.print(Panel("Finders - Deep Financial Research", style="bold cyan"))
@@ -37,44 +34,54 @@ class TUI:
         preview = str(query)[:80] if query else ""
         self.console.print(f"  [dim]Tool:[/dim] {tool} {f'[dim]({preview})[/dim]' if preview else ''}")
 
-    def print_tool_end(self, tool: str, preview: str, duration_ms: int) -> None:
+    def print_tool_end(self, tool: str, duration_ms: int) -> None:
         self.console.print(f"  [dim]Done: {tool} ({duration_ms}ms)[/dim]")
 
     def print_tool_error(self, tool: str, error: str) -> None:
         self.console.print(f"  [red]Error: {tool} - {error}[/red]")
 
-    def print_thinking(self, msg: str) -> None:
-        self._thinking_msg = msg
-        self.console.print(f"  [yellow]{msg}[/yellow]")
+    def print_thinking(self) -> None:
+        self.console.print(f"  [yellow]Thinking...[/yellow]")
 
     def print_separator(self) -> None:
         self.console.print()
 
-    async def run_query(self, runner: AgentRunner) -> None:
+    async def run_query(self, agent, query: str) -> None:
         """运行查询并流式显示事件。"""
-        self._thinking_msg = ""
+        import time
+
+        tool_start_times: dict[str, float] = {}
+
         with Live(Spinner("dots", text="Thinking...", style="yellow"), refresh_per_second=10, transient=True):
-            async for event in runner.run_stream():
-                if event.type == "thinking":
-                    self.print_thinking(event.data.get("message", ""))
-                elif event.type == "tool_start":
-                    self.print_tool_start(
-                        event.data.get("tool", ""),
-                        event.data.get("args", {}),
-                    )
-                elif event.type == "tool_end":
-                    self.print_tool_end(
-                        event.data.get("tool", ""),
-                        event.data.get("result_preview", ""),
-                        event.data.get("duration_ms", 0),
-                    )
-                elif event.type == "tool_error":
-                    self.print_tool_error(
-                        event.data.get("tool", ""),
-                        event.data.get("error", ""),
-                    )
-                elif event.type == "answer":
-                    answer = event.data.get("answer", "")
-                    if answer:
-                        self.print_answer(answer)
-                    break
+            async for event in agent.astream_events(
+                {"messages": [("user", query)]},
+                version="v2",
+            ):
+                kind = event["event"]
+
+                if kind == "on_chat_model_start":
+                    self.print_thinking()
+
+                elif kind == "on_tool_start":
+                    tool_name = event["name"]
+                    tool_start_times[tool_name] = time.time()
+                    args = event["data"].get("input", {})
+                    self.print_tool_start(tool_name, args)
+
+                elif kind == "on_tool_end":
+                    tool_name = event["name"]
+                    start_time = tool_start_times.pop(tool_name, time.time())
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    self.print_tool_end(tool_name, duration_ms)
+
+                elif kind == "on_tool_error":
+                    tool_name = event["name"]
+                    error = str(event["data"].get("error", "Unknown error"))
+                    self.print_tool_error(tool_name, error)
+
+                elif kind == "on_chat_model_end":
+                    # 最终回答
+                    chunks = event["data"].get("output", {})
+                    if hasattr(chunks, "content") and chunks.content:
+                        self.print_answer(chunks.content)
+                        break

@@ -43,10 +43,10 @@ def test_query_request_overrides():
 def test_query_endpoint_returns_sse(client):
     """验证 POST /api/query 返回的是 SSE 响应。"""
     with patch("finders.api.routes._build_settings") as mock_build, \
-         patch("finders.api.routes.AgentRunner") as mock_runner:
+         patch("finders.api.routes.create_finders_agent") as mock_create:
         mock_build.return_value = MagicMock()
-        mock_instance = MagicMock()
-        mock_runner.return_value = mock_instance
+        mock_agent = MagicMock()
+        mock_create.return_value = mock_agent
 
         # SSE stream 会返回 200，但 TestClient 无法流式消费
         response = client.post("/api/query", json={"query": "test"})

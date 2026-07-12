@@ -17,11 +17,10 @@ description: A test skill
 Do something useful.
 """, encoding="utf-8")
 
-    result = _parse_skill_metadata(skill_file, source="user")
+    result = _parse_skill_metadata(skill_file)
     assert result is not None
     assert result["name"] == "test-skill"
     assert result["description"] == "A test skill"
-    assert result["source"] == "user"
 
 
 def test_parse_skill_metadata_missing_fields(tmp_path):
@@ -29,7 +28,7 @@ def test_parse_skill_metadata_missing_fields(tmp_path):
     skill_dir.mkdir()
     skill_file = skill_dir / "SKILL.md"
     skill_file.write_text("---\nname: test\n---\nInstructions", encoding="utf-8")
-    assert _parse_skill_metadata(skill_file, source="user") is None
+    assert _parse_skill_metadata(skill_file) is None
 
 
 def test_parse_skill_metadata_no_frontmatter(tmp_path):
@@ -37,11 +36,11 @@ def test_parse_skill_metadata_no_frontmatter(tmp_path):
     skill_dir.mkdir()
     skill_file = skill_dir / "SKILL.md"
     skill_file.write_text("No yaml frontmatter", encoding="utf-8")
-    assert _parse_skill_metadata(skill_file, source="user") is None
+    assert _parse_skill_metadata(skill_file) is None
 
 
 def test_list_skills_empty(tmp_path):
-    skills = list_skills(user_skills_dir=tmp_path / "nonexistent")
+    skills = list_skills([tmp_path / "nonexistent"])
     assert isinstance(skills, list)
     assert len(skills) == 0
 
@@ -59,10 +58,9 @@ description: A test skill
 Instructions here.
 """, encoding="utf-8")
 
-    skills = list_skills(user_skills_dir=skills_dir)
+    skills = list_skills([skills_dir])
     assert len(skills) == 1
     assert skills[0]["name"] == "test-skill"
-    assert skills[0]["source"] == "user"
 
 
 def test_list_skills_project_overrides_user(tmp_path):
@@ -91,9 +89,8 @@ description: Project skill
 Project instructions.
 """, encoding="utf-8")
 
-    skills = list_skills(user_skills_dir=user_dir, project_skills_dir=project_dir)
+    skills = list_skills([user_dir, project_dir])
     assert len(skills) == 1
-    assert skills[0]["source"] == "project"
     assert skills[0]["description"] == "Project skill"
 
 
@@ -119,7 +116,7 @@ description: Skill B
 Instructions B.
 """, encoding="utf-8")
 
-    skills = list_skills(user_skills_dir=skills_dir)
+    skills = list_skills([skills_dir])
     assert len(skills) == 2
     names = {s["name"] for s in skills}
     assert names == {"skill-a", "skill-b"}

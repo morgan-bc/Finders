@@ -12,12 +12,21 @@ from langchain.agents.middleware import (
     ToolRetryMiddleware,
     ModelFallbackMiddleware,
 )
+from langchain.agents import AgentState
+
 from finders.utils.config import Settings
 from finders.tools.registry import get_core_tools
 from finders.agents.prompt import build_system_prompt
 from finders.utils.paths import get_finders_dir
 from finders.skills.middleware import SkillsMiddleware
 from finders.middlewares.dynamic_context import DynamicContextMiddleware
+
+
+
+class SkillAgentState(AgentState):
+    """Skill agent state."""
+    
+    skill_metadata: dict[str, str] = {}
 
 
 def _build_middleware(settings: Settings, allowed_skills: list[str] | None = None, disallowed_skills: list[str] | None = None, max_calls_per_tool: int | None = None):
@@ -27,8 +36,10 @@ def _build_middleware(settings: Settings, allowed_skills: list[str] | None = Non
 
     return [
         SkillsMiddleware(
-            skills_dir=Path.home() / ".finders" / "skills",
-            project_skills_dir=settings.get_project_dir() / "skills",
+            skills_dir=[
+                str(get_finders_dir() / "skills"),
+                str(settings.get_project_dir() / "skills"),
+            ],
             allowed=allowed_skills,
             disallowed=disallowed_skills,
         ),
@@ -39,18 +50,18 @@ def _build_middleware(settings: Settings, allowed_skills: list[str] | None = Non
             trigger=("tokens", settings.agent.compact_threshold),
         ),
         ContextEditingMiddleware(),
-        ToolCallLimitMiddleware(
-            run_limit=max_calls_per_tool if max_calls_per_tool is not None else settings.tools.max_calls_per_tool,
-        ),
+        # ToolCallLimitMiddleware(
+        #     run_limit=max_calls_per_tool if max_calls_per_tool is not None else settings.tools.max_calls_per_tool,
+        # ),
         ToolRetryMiddleware(
             max_retries=2,
         ),
         ModelRetryMiddleware(
             max_retries=3,
         ),
-        HumanInTheLoopMiddleware(
-            interrupt_on={"write_file": True, "edit_file": True},
-        ),
+        # HumanInTheLoopMiddleware(
+        #     interrupt_on={"write_file": True, "edit_file": True},
+        # ),
     ]
 
 
@@ -78,5 +89,5 @@ def create_finders_agent(settings: Settings):
         tools=tools,
         system_prompt=system_prompt,
         middleware=middleware,
-        recursion_limit=settings.agent.recursion_limit,
+        state_schema=SkillAgentState,
     )

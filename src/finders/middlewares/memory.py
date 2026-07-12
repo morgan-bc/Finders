@@ -96,7 +96,7 @@ class MemoryMiddleware(AgentMiddleware):
 
         return None
 
-    async def after_model(self, state, runtime: Runtime) -> dict[str, Any] | None:
+    async def aafter_model(self, state, runtime: Runtime) -> dict[str, Any] | None:
         """Flush: 检查上下文 token 数，接近阈值时提取关键事实。"""
         if self._already_flushed:
             return None

@@ -5,9 +5,9 @@ This middleware implements Anthropic's "Agent Skills" pattern with progressive d
 2. Inject skills metadata (name + description) into system prompt
 3. Agent reads full SKILL.md content when relevant to a task
 
-Skills directory structure (per-agent + project):
-User-level: ~/.finders/skills/
-Project-level: {PROJECT_ROOT}/.finders/skills/
+Skills are loaded from one or more directories (str | list[str]).
+When multiple directories are provided, later ones override earlier ones
+on name conflicts.
 
 Example structure:
 ~/.finders/skills/
@@ -17,22 +17,18 @@ Example structure:
 ├── code-review/
 │   ├── SKILL.md
 │   └── checklist.md
-
-.finders/skills/
-├── project-specific/
-│   └── SKILL.md        # Project-specific skills
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
-from langchain.agents.middleware.types import AgentMiddleware
+from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.messages import SystemMessage
 
-from finders.skills.load import SkillMetadata, list_skills
+from finders.skills.load import SkillMetadata, _list_skills
 
 SKILLS_SYSTEM_PROMPT = """
 <skills_system>
@@ -71,14 +67,11 @@ class SkillsMiddleware(AgentMiddleware):
     - Injects skills list into system prompt for discoverability
     - Agent reads full SKILL.md content when a skill is relevant (progressive disclosure)
 
-    Supports both user-level and project-level skills:
-    - User skills: ~/.finders/skills/
-    - Project skills: {PROJECT_ROOT}/.finders/skills/
-    - Project skills override user skills with the same name
+    Supports multiple skills directories; later directories override earlier ones
+    when skill names conflict.
 
     Args:
-        skills_dir: Path to the user-level skills directory.
-        project_skills_dir: Optional path to project-level skills directory.
+        skills_dir: Path or list of paths to skills directories.
         allowed: Optional list of skill names to allow. If set, only these skills are loaded.
         disallowed: Optional list of skill names to exclude.
     """
@@ -86,99 +79,102 @@ class SkillsMiddleware(AgentMiddleware):
     def __init__(
         self,
         *,
-        skills_dir: str | Path,
-        project_skills_dir: str | Path | None = None,
+        skills_dir: str | list[str],
         allowed: list[str] | None = None,
         disallowed: list[str] | None = None,
     ) -> None:
         """Initialize the skills middleware.
 
         Args:
-            skills_dir: Path to the user-level skills directory.
-            project_skills_dir: Optional path to the project-level skills directory.
+            skills_dir: Path or list of paths to skills directories.
             allowed: Optional list of skill names to allow. If set, only these skills are loaded.
             disallowed: Optional list of skill names to exclude.
         """
-        self.skills_dir = Path(skills_dir).expanduser()
-        self.project_skills_dir = (
-            Path(project_skills_dir).expanduser() if project_skills_dir else None
-        )
+        if isinstance(skills_dir, str):
+            self.skills_dirs = [Path(skills_dir).expanduser()]
+        else:
+            self.skills_dirs = [Path(d).expanduser() for d in set(skills_dir)]
         self.allowed = set(allowed) if allowed else None
         self.disallowed = set(disallowed) if disallowed else None
+        self._skills_metadata: list[SkillMetadata] = []
 
     def before_agent(self, state: dict[str, Any], runtime) -> dict[str, Any] | None:
         """Load skills metadata before agent execution.
 
-        This runs once at session start to discover available skills from both
-        user-level and project-level directories.
+        This runs once at session start to discover available skills from all
+        configured skills directories.
 
         Args:
             state: Current agent state.
             runtime: Runtime context.
 
         Returns:
-            Updated state with skills_metadata populated.
+            None (skills are stored in instance variable for later use).
         """
-        skills = list_skills(
-            user_skills_dir=self.skills_dir,
-            project_skills_dir=self.project_skills_dir,
-        )
+        all_skills: dict[str, SkillMetadata] = {}
+        for skills_dir in self.skills_dirs:
+            skills = _list_skills(skills_dir)
+            for skill in skills:
+                all_skills[skill["name"]] = skill
+
+        skills_list = list(all_skills.values())
 
         # Filter skills based on allowed/disallowed lists
         if self.allowed is not None:
-            skills = [s for s in skills if s["name"] in self.allowed]
+            skills_list = [s for s in skills_list if s["name"] in self.allowed]
         if self.disallowed is not None:
-            skills = [s for s in skills if s["name"] not in self.disallowed]
+            skills_list = [s for s in skills_list if s["name"] not in self.disallowed]
 
-        return {"skills_metadata": skills}
+        self._skills_metadata = skills_list
+        return {"skill_metadata": skills_list}
 
-    def before_model(self, state: dict[str, Any], runtime) -> dict[str, Any] | None:
-        """Inject skills documentation into the system prompt.
-
-        This runs on every model call to ensure skills info is always available.
+        
+    def modify_request(self, request):
+        """Modify the request to include skills metadata.
 
         Args:
-            state: Current agent state.
-            runtime: Runtime context.
+            request: Model request to modify.
+        Returns:
+            Modified model request with skills metadata.
+        """
+        
+        skills_list = self._format_skills_list(self._skills_metadata)
+        skills_section = SKILLS_SYSTEM_PROMPT.format(skills_list=skills_list)
+        system_prompt = request.system_prompt
+        if system_prompt is not None:
+            system_prompt = system_prompt + "\n\n" + skills_section
+            request = request.override(system_prompt=system_prompt)
+        return request 
+
+
+    def wrap_model_call(
+        self,
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], ModelResponse[Any]],
+    ) -> ModelResponse[Any]:
+        """Inject skills documentation into the system prompt.
+
+        This intercepts every model call to ensure skills info is always available.
+
+        Args:
+            request: Model request containing state and messages.
+            handler: Callback to execute the model request.
 
         Returns:
-            Updated state with modified system message, or None.
+            The model response after injecting skills documentation.
         """
-        skills_metadata = state.get("skills_metadata", [])
+        request = self.modify_request(request)
+        return handler(request)
 
-        skills_list = self._format_skills_list(skills_metadata)
+    async def awrap_model_call(
+        self,
+        request: ModelRequest[Any],
+        handler: Callable[[ModelRequest[Any]], Awaitable[ModelResponse[Any]]],
+    ) -> ModelResponse[Any]:
+        """Async version of wrap_model_call."""
+        request = self.modify_request(request)
+        return await handler(request)
 
-        skills_section = SKILLS_SYSTEM_PROMPT.format(skills_list=skills_list)
-
-        messages = list(state.get("messages", []))
-        if messages and isinstance(messages[0], SystemMessage):
-            original_content = messages[0].content
-            if isinstance(original_content, str) and "<skills_system>" not in original_content:
-                skills_suffix = f"\n\n{skills_section}"
-                messages[0] = SystemMessage(content=original_content + skills_suffix)
-                return {"messages": messages}
-
-        return None
-
-    def _to_virtual_path(self, path: str) -> str:
-        """Convert a local skill path to a virtual container path.
-
-        Project skills map to /proj_skill/... and user skills map to
-        /user_skill/... so that all paths surfaced in prompts are virtual
-        paths resolvable by the sandbox.
-        """
-        p = str(Path(path).expanduser().resolve())
-        if self.project_skills_dir is not None:
-            proj = str(self.project_skills_dir.expanduser().resolve())
-            if p == proj or p.startswith(proj + os.sep):
-                rel = p[len(proj):].lstrip(os.sep).replace(os.sep, "/")
-                return f"/proj_skill/{rel}" if rel else "/proj_skill"
-        if self.skills_dir is not None:
-            usr = str(self.skills_dir.expanduser().resolve())
-            if p == usr or p.startswith(usr + os.sep):
-                rel = p[len(usr):].lstrip(os.sep).replace(os.sep, "/")
-                return f"/user_skill/{rel}" if rel else "/user_skill"
-        return path
 
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:
         """Format skills metadata for display in system prompt."""
@@ -187,12 +183,13 @@ class SkillsMiddleware(AgentMiddleware):
 
         lines = ["<available_skills>"]
         for skill in skills:
-            location = self._to_virtual_path(skill["path"])
+            location = skill["path"]
             lines.append(
-                f"  <skill name={skill['name']}>\n"
-                f"    <description>{skill['description']}</description>\n"
-                f"    <location>{location}</location>\n"
-                f"  </skill>"
+                f"<skill>\n"
+                f"<name>{skill['name']}</name>\n"
+                f"<description>{skill['description']}</description>\n"
+                f"<location>{location}</location>\n"
+                f"</skill>"
             )
         lines.append("</available_skills>")
 

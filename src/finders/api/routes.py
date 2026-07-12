@@ -1,13 +1,13 @@
 """FastAPI routes."""
 from __future__ import annotations
 
+import json
 from sse_starlette.sse import EventSourceResponse
 
 from fastapi import APIRouter
 
 from finders.api.models import HealthResponse, QueryRequest
-from finders.api.sse import agent_event_stream
-from finders.agents.runner import AgentRunner
+from finders.agents.factory import create_finders_agent
 from finders.utils.config import get_settings, Settings
 
 router = APIRouter(prefix="/api")
@@ -22,8 +22,54 @@ async def health() -> HealthResponse:
 async def query(request: QueryRequest):
     """启动 Agent 查询，返回 SSE 事件流。"""
     settings = _build_settings(request)
-    runner = AgentRunner(settings, request.query)
-    return EventSourceResponse(agent_event_stream(runner.run_stream()))
+    agent = create_finders_agent(settings)
+
+    async def event_stream():
+        async for event in agent.astream_events(
+            {"messages": [("user", request.query)]},
+            version="v2",
+        ):
+            kind = event["event"]
+
+            if kind == "on_chat_model_start":
+                yield {"event": "thinking", "data": json.dumps({"message": "Thinking..."})}
+
+            elif kind == "on_tool_start":
+                yield {
+                    "event": "tool_start",
+                    "data": json.dumps({
+                        "tool": event["name"],
+                        "args": event["data"].get("input", {}),
+                    }),
+                }
+
+            elif kind == "on_tool_end":
+                yield {
+                    "event": "tool_end",
+                    "data": json.dumps({
+                        "tool": event["name"],
+                        "status": "completed",
+                    }),
+                }
+
+            elif kind == "on_tool_error":
+                yield {
+                    "event": "tool_error",
+                    "data": json.dumps({
+                        "tool": event["name"],
+                        "error": str(event["data"].get("error", "Unknown")),
+                    }),
+                }
+
+            elif kind == "on_chat_model_end":
+                output = event["data"].get("output")
+                if output and hasattr(output, "content") and output.content:
+                    yield {
+                        "event": "answer",
+                        "data": json.dumps({"answer": output.content}),
+                    }
+
+    return EventSourceResponse(event_stream())
 
 
 def _build_settings(request: QueryRequest) -> Settings:

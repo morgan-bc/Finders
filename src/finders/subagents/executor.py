@@ -10,10 +10,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from pathlib import Path
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain.agents.middleware import TodoListMiddleware, ToolRetryMiddleware, ModelRetryMiddleware
 
+from finders.middlewares.dynamic_context import DynamicContextMiddleware
 from finders.subagents.config import SubagentConfig
 from finders.utils.config import get_settings
 
@@ -76,10 +79,12 @@ class SubagentExecutor:
         config: SubagentConfig,
         tools: list,
         parent_model: str | None = None,
+        skill_metadata: dict[str, dict] | None = None,
     ):
         self.config = config
         self.parent_model = parent_model
         self.trace_id = str(uuid.uuid4())[:8]
+        self.skill_metadata = skill_metadata
 
         self.tools = _filter_tools(
             tools,
@@ -89,25 +94,45 @@ class SubagentExecutor:
 
         logger.info(f"[trace={self.trace_id}] SubagentExecutor initialized: {config.name} with {len(self.tools)} tools")
 
+    def _load_skills_content(self) -> str:
+        """Load skill content directly into system prompt."""
+        if not self.config.allowed_skills:
+            return ""
+        
+        skill_section = []
+        for skill_name in self.config.allowed_skills:
+            skill = self.skill_metadata.get(skill_name, None)
+            if skill is not None:
+                skill_content = Path(skill["path"]).read_text(encoding="utf-8")
+                skill_content = f"<skill>{skill_content}</skill>"
+                skill_section.append(skill_content)
+        
+        return "\n\n".join(skill_section)
+
     def _create_agent(self):
         """Create the agent instance."""
         settings = get_settings()
         model_name = self.parent_model if self.config.model == "inherit" else self.config.model
         model = settings.create_chat_model(model_name=model_name)
 
-        from finders.agents.factory import _build_middleware
-        middlewares = _build_middleware(
-            settings,
-            allowed_skills=self.config.allowed_skills,
-            disallowed_skills=self.config.disallowed_skills,
-            max_calls_per_tool=self.config.max_calls_per_tool,
-        )
+        middlewares = [
+            DynamicContextMiddleware(),
+            TodoListMiddleware(),
+            ToolRetryMiddleware(max_retries=2),
+            ModelRetryMiddleware(max_retries=3),
+        ]
+
+        # Load skills content directly into system prompt
+        system_prompt = self.config.system_prompt
+        skills_content = self._load_skills_content()
+        if skills_content:
+            system_prompt = system_prompt + "\n\n" + skills_content
 
         return create_agent(
             model=model,
             tools=self.tools,
             middleware=middlewares,
-            system_prompt=self.config.system_prompt,
+            system_prompt=system_prompt,
         )
 
     def _build_initial_state(self, task: str) -> dict[str, Any]:
@@ -146,7 +171,6 @@ class SubagentExecutor:
                 messages = chunk.get("messages", [])
                 if messages:
                     last_message = messages[-1]
-                    from langchain_core.messages import AIMessage
                     if isinstance(last_message, AIMessage):
                         message_dict = last_message.model_dump()
                         message_id = message_dict.get("id")
@@ -166,7 +190,6 @@ class SubagentExecutor:
             else:
                 messages = final_state.get("messages", [])
                 last_ai_message = None
-                from langchain_core.messages import AIMessage
                 for msg in reversed(messages):
                     if isinstance(msg, AIMessage):
                         last_ai_message = msg
@@ -259,7 +282,6 @@ class SubagentExecutor:
                         _background_tasks[task_id].status = SubagentStatus.TIMED_OUT
                         _background_tasks[task_id].error = f"Execution timed out after {self.config.timeout_seconds} seconds"
                         _background_tasks[task_id].completed_at = datetime.now()
-                    execution_future.cancel()
             except Exception as e:
                 logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} async execution failed")
                 with _background_tasks_lock:
