@@ -1,138 +1,106 @@
-"""获取资产负债表数据（年/季度，合并+母公司）"""
+#!/usr/bin/env python3
+"""获取资产负债表数据"""
+
 import argparse
 import sys
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
-import akshare as ak
 
-sys.path.insert(0, str(Path(__file__).parent))
-from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger, get_data_dir
+from utils import (
+    get_tushare_api,
+    normalize_stock_code,
+    save_json,
+    get_date_range,
+    df_to_dict,
+    safe_float
+)
 
-logger = setup_logger(__name__)
 
-
-def get_balance_sheet(stock_code: str, years: int = 5, frequency: str = 'both', output_dir: Path = None) -> dict:
-    """
-    获取股票的资产负债表数据。
-    
-    Args:
-        stock_code: 6位股票代码
-        years: 历史数据年数
-        frequency: 数据频率 - 'yearly'(年度), 'quarterly'(季度), 'both'(两者)
-        output_dir: JSON 输出目录
-    
-    Returns:
-        包含数据集的字典
-    """
-    if output_dir is None:
-        output_dir = get_data_dir()
-    
-    stock_info = validate_stock_code(stock_code)
-    logger.info(f"正在获取 {stock_info['name']} ({stock_code}) 的资产负债表，{years} 年，频率: {frequency}")
-    
-    result = {}
-    fetch_yearly = frequency in ('yearly', 'both')
-    fetch_quarterly = frequency in ('quarterly', 'both')
-    
-    # 获取合并资产负债表
+def get_balance_sheet(pro, ts_code, years=5):
+    """获取资产负债表数据"""
     try:
-        df = fetch_with_retry(
-            ak.stock_balance_sheet_by_report_em,
-            symbol=stock_code
+        start_date, end_date = get_date_range(years)
+        
+        df = pro.balancesheet(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields='ts_code,ann_date,end_date,report_type,total_assets,total_liab,total_hldr_eqy_exc_min_int,money_cap,notes_receiv,accounts_receiv,inventories,fix_assets,intang_assets,goodwill,short_term_loan,long_term_loan,bonds_payable'
         )
-        if not df.empty:
-            df = clean_financial_data(df)
-            
-            # 年度数据
-            if fetch_yearly:
-                yearly_data = [r for r in df.to_dict('records') 
-                              if r.get('REPORT_DATE', '').endswith('12-31')][:years]
-                result['consolidated_yearly'] = {
-                    'stock_code': stock_code,
-                    'stock_name': stock_info['name'],
-                    'report_type': 'consolidated',
-                    'frequency': 'yearly',
-                    'years': years,
-                    'fetch_time': datetime.now().isoformat(),
-                    'data': yearly_data
-                }
-            
-            # 季度数据
-            if fetch_quarterly:
-                quarterly_data = df.head(years * 4).to_dict('records')
-                result['consolidated_quarterly'] = {
-                    'stock_code': stock_code,
-                    'stock_name': stock_info['name'],
-                    'report_type': 'consolidated',
-                    'frequency': 'quarterly',
-                    'years': years,
-                    'fetch_time': datetime.now().isoformat(),
-                    'data': quarterly_data
-                }
-        else:
-            if fetch_yearly:
-                result['consolidated_yearly'] = {'error': '无数据'}
-            if fetch_quarterly:
-                result['consolidated_quarterly'] = {'error': '无数据'}
-            
-    except Exception as e:
-        logger.error(f"获取合并资产负债表失败: {e}")
-        if fetch_yearly:
-            result['consolidated_yearly'] = {'error': str(e)}
-        if fetch_quarterly:
-            result['consolidated_quarterly'] = {'error': str(e)}
-    
-    # 获取母公司资产负债表
-    try:
-        if fetch_yearly and 'consolidated_yearly' in result and 'data' in result['consolidated_yearly']:
-            result['parent_yearly'] = {
-                'stock_code': stock_code,
-                'stock_name': stock_info['name'],
-                'report_type': 'parent',
-                'frequency': 'yearly',
-                'years': years,
-                'fetch_time': datetime.now().isoformat(),
-                'data': result['consolidated_yearly']['data'],
-                'note': '母公司报表数据暂不可用，使用合并报表数据代替'
+        
+        if df.empty:
+            return []
+        
+        # 转换数据
+        records = []
+        for _, row in df.iterrows():
+            record = {
+                'end_date': row.get('end_date'),
+                'ann_date': row.get('ann_date'),
+                'report_type': row.get('report_type'),
+                'total_assets': safe_float(row.get('total_assets')),
+                'total_liab': safe_float(row.get('total_liab')),
+                'total_equity': safe_float(row.get('total_hldr_eqy_exc_min_int')),
+                'money_cap': safe_float(row.get('money_cap')),
+                'accounts_receiv': safe_float(row.get('accounts_receiv')),
+                'inventories': safe_float(row.get('inventories')),
+                'fix_assets': safe_float(row.get('fix_assets')),
+                'intang_assets': safe_float(row.get('intang_assets')),
+                'goodwill': safe_float(row.get('goodwill')),
+                'short_term_loan': safe_float(row.get('short_term_loan')),
+                'long_term_loan': safe_float(row.get('long_term_loan')),
+                'bonds_payable': safe_float(row.get('bonds_payable'))
             }
-        if fetch_quarterly and 'consolidated_quarterly' in result and 'data' in result['consolidated_quarterly']:
-            result['parent_quarterly'] = {
-                'stock_code': stock_code,
-                'stock_name': stock_info['name'],
-                'report_type': 'parent',
-                'frequency': 'quarterly',
-                'years': years,
-                'fetch_time': datetime.now().isoformat(),
-                'data': result['consolidated_quarterly']['data'],
-                'note': '母公司报表数据暂不可用，使用合并报表数据代替'
-            }
-            
+            records.append(record)
+        
+        return records
     except Exception as e:
-        logger.error(f"获取母公司资产负债表失败: {e}")
-        if fetch_yearly:
-            result['parent_yearly'] = {'error': str(e)}
-        if fetch_quarterly:
-            result['parent_quarterly'] = {'error': str(e)}
+        print(f"获取资产负债表失败: {e}")
+        return []
+
+
+def main():
+    parser = argparse.ArgumentParser(description='获取资产负债表数据')
+    parser.add_argument('stock_code', help='股票代码（如 600519.SH 或 600519）')
+    parser.add_argument('--token', help='Tushare API token')
+    parser.add_argument('--years', type=int, default=5, help='历史数据年数（默认5年）')
     
-    # 保存所有4个 JSON 文件
-    for key, data in result.items():
-        output_file = output_dir / f"{stock_code}_balance_sheet_{key}.json"
-        save_json(data, output_file)
-        logger.info(f"已保存 {key} 资产负债表到 {output_file}")
+    args = parser.parse_args()
     
-    return result
+    # 初始化 API
+    pro = get_tushare_api(args.token)
+    
+    # 标准化股票代码
+    ts_code = normalize_stock_code(args.stock_code)
+    print(f"正在获取 {ts_code} 的资产负债表数据...")
+    
+    # 获取数据
+    balance_sheet_data = get_balance_sheet(pro, ts_code, args.years)
+    
+    if not balance_sheet_data:
+        print("未获取到资产负债表数据")
+        sys.exit(1)
+    
+    # 保存数据
+    filename = f"{ts_code.replace('.', '_')}_balance_sheet.json"
+    filepath = save_json(balance_sheet_data, filename)
+    
+    print(f"\n数据已保存到: {filepath}")
+    print(f"共获取 {len(balance_sheet_data)} 期数据")
+    
+    # 显示最新一期数据
+    if balance_sheet_data:
+        latest = balance_sheet_data[0]
+        print("\n=== 最新资产负债表摘要 ===")
+        print(f"报告期: {latest.get('end_date')}")
+        print(f"总资产: {latest.get('total_assets') / 10000:.2f} 亿元")
+        print(f"总负债: {latest.get('total_liab') / 10000:.2f} 亿元")
+        print(f"净资产: {latest.get('total_equity') / 10000:.2f} 亿元")
+        print(f"货币资金: {latest.get('money_cap') / 10000:.2f} 亿元")
+        print(f"应收账款: {latest.get('accounts_receiv') / 10000:.2f} 亿元")
+        print(f"存货: {latest.get('inventories') / 10000:.2f} 亿元")
+        print(f"固定资产: {latest.get('fix_assets') / 10000:.2f} 亿元")
+        print(f"短期借款: {latest.get('short_term_loan') / 10000:.2f} 亿元")
+        print(f"长期借款: {latest.get('long_term_loan') / 10000:.2f} 亿元")
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='获取资产负债表数据')
-    parser.add_argument('stock_code', help='股票代码（如 600519）')
-    parser.add_argument('--years', type=int, default=5, help='年数（默认: 5）')
-    parser.add_argument('--frequency', choices=['yearly', 'quarterly', 'both'], default='both',
-                       help='数据频率: yearly(年度), quarterly(季度), both(两者，默认)')
-    parser.add_argument('--output-dir', type=Path,
-                       default=None,
-                       help='输出目录（默认：FINDERS_WORKSPACE/data）')
-    args = parser.parse_args()
-    
-    get_balance_sheet(args.stock_code, args.years, args.frequency, args.output_dir)
+    main()
