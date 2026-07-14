@@ -8,7 +8,6 @@ from utils import (
     get_tushare_api,
     normalize_stock_code,
     save_json,
-    get_date_range,
     safe_float
 )
 
@@ -100,11 +99,9 @@ FIELD_MAP = {
 }
 
 
-def get_income_statement(pro, ts_code, years=5):
+def get_income_statement(pro, ts_code, start_date, end_date):
     """获取利润表完整数据"""
     try:
-        start_date, end_date = get_date_range(years)
-
         df = pro.income(
             ts_code=ts_code,
             start_date=start_date,
@@ -138,20 +135,20 @@ def get_income_statement(pro, ts_code, years=5):
 def main():
     parser = argparse.ArgumentParser(description='获取利润表数据')
     parser.add_argument('stock_code', help='股票代码（如 600519.SH 或 600519）')
-    parser.add_argument('--token', help='Tushare API token')
-    parser.add_argument('--years', type=int, default=5, help='历史数据年数（默认5年）')
+    parser.add_argument('--start_date', required=True, help='开始日期（YYYYMMDD格式）')
+    parser.add_argument('--end_date', required=True, help='结束日期（YYYYMMDD格式）')
 
     args = parser.parse_args()
 
     # 初始化 API
-    pro = get_tushare_api(args.token)
+    pro = get_tushare_api()
 
     # 标准化股票代码
     ts_code = normalize_stock_code(args.stock_code)
     print(f"正在获取 {ts_code} 的利润表数据...")
 
     # 获取数据
-    income_data = get_income_statement(pro, ts_code, args.years)
+    income_data = get_income_statement(pro, ts_code, args.start_date, args.end_date)
 
     if not income_data:
         print("未获取到利润表数据")
