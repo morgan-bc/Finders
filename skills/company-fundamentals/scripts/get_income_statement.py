@@ -1,140 +1,109 @@
-"""获取利润表数据（年/季度，合并+母公司）"""
+#!/usr/bin/env python3
+"""获取利润表数据"""
+
 import argparse
 import sys
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
-import akshare as ak
 
-sys.path.insert(0, str(Path(__file__).parent))
-from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger, get_data_dir
+from utils import (
+    get_tushare_api,
+    normalize_stock_code,
+    save_json,
+    get_date_range,
+    df_to_dict,
+    safe_float
+)
 
-logger = setup_logger(__name__)
 
-
-def get_income_statement(stock_code: str, years: int = 5, frequency: str = 'both', output_dir: Path = None) -> dict:
-    """
-    获取股票的利润表数据。
-    
-    Args:
-        stock_code: 6位股票代码
-        years: 历史数据年数
-        frequency: 数据频率 - 'yearly'(年度), 'quarterly'(季度), 'both'(两者)
-        output_dir: JSON 输出目录
-    
-    Returns:
-        包含数据集的字典
-    """
-    if output_dir is None:
-        output_dir = get_data_dir()
-    
-    stock_info = validate_stock_code(stock_code)
-    logger.info(f"正在获取 {stock_info['name']} ({stock_code}) 的利润表，{years} 年，频率: {frequency}")
-    
-    result = {}
-    fetch_yearly = frequency in ('yearly', 'both')
-    fetch_quarterly = frequency in ('quarterly', 'both')
-    
-    # 获取合并利润表
+def get_income_statement(pro, ts_code, years=5):
+    """获取利润表数据"""
     try:
-        income_df = fetch_with_retry(
-            ak.stock_profit_sheet_by_report_em,
-            symbol=stock_code
+        start_date, end_date = get_date_range(years)
+        
+        df = pro.income(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields='ts_code,ann_date,end_date,report_type,revenue,operate_profit,total_profit,n_income,n_income_attr_p,basic_eps,diluted_eps,operate_exp,total_cogs,sell_exp,manage_exp,research_exp,finance_exp,interest_exp,fee_exp'
         )
         
-        if not income_df.empty:
-            income_df = clean_financial_data(income_df)
-            
-            # 年度数据（12月31日的报告）
-            if fetch_yearly:
-                yearly_data = [r for r in income_df.to_dict('records') 
-                              if r.get('REPORT_DATE', '').endswith('12-31')][:years]
-                
-                result['consolidated_yearly'] = {
-                    'stock_code': stock_code,
-                    'stock_name': stock_info['name'],
-                    'report_type': 'consolidated',
-                    'frequency': 'yearly',
-                    'years': years,
-                    'fetch_time': datetime.now().isoformat(),
-                    'data': yearly_data
-                }
-            
-            # 季度数据
-            if fetch_quarterly:
-                quarterly_data = income_df.head(years * 4).to_dict('records')
-                result['consolidated_quarterly'] = {
-                    'stock_code': stock_code,
-                    'stock_name': stock_info['name'],
-                    'report_type': 'consolidated',
-                    'frequency': 'quarterly',
-                    'years': years,
-                    'fetch_time': datetime.now().isoformat(),
-                    'data': quarterly_data
-                }
-        else:
-            if fetch_yearly:
-                result['consolidated_yearly'] = {'error': '无数据'}
-            if fetch_quarterly:
-                result['consolidated_quarterly'] = {'error': '无数据'}
-            
-    except Exception as e:
-        logger.error(f"获取合并利润表失败: {e}")
-        if fetch_yearly:
-            result['consolidated_yearly'] = {'error': str(e)}
-        if fetch_quarterly:
-            result['consolidated_quarterly'] = {'error': str(e)}
-    
-    # 获取母公司利润表
-    try:
-        if fetch_yearly and 'consolidated_yearly' in result and 'data' in result['consolidated_yearly']:
-            result['parent_yearly'] = {
-                'stock_code': stock_code,
-                'stock_name': stock_info['name'],
-                'report_type': 'parent',
-                'frequency': 'yearly',
-                'years': years,
-                'fetch_time': datetime.now().isoformat(),
-                'data': result['consolidated_yearly']['data'],
-                'note': '母公司报表数据暂不可用，使用合并报表数据代替'
+        if df.empty:
+            return []
+        
+        # 转换数据
+        records = []
+        for _, row in df.iterrows():
+            record = {
+                'end_date': row.get('end_date'),
+                'ann_date': row.get('ann_date'),
+                'report_type': row.get('report_type'),
+                'revenue': safe_float(row.get('revenue')),
+                'operate_profit': safe_float(row.get('operate_profit')),
+                'total_profit': safe_float(row.get('total_profit')),
+                'net_income': safe_float(row.get('n_income')),
+                'net_income_attr_p': safe_float(row.get('n_income_attr_p')),
+                'basic_eps': safe_float(row.get('basic_eps')),
+                'diluted_eps': safe_float(row.get('diluted_eps')),
+                'operate_exp': safe_float(row.get('operate_exp')),
+                'total_cogs': safe_float(row.get('total_cogs')),
+                'sell_exp': safe_float(row.get('sell_exp')),
+                'manage_exp': safe_float(row.get('manage_exp')),
+                'research_exp': safe_float(row.get('research_exp')),
+                'finance_exp': safe_float(row.get('finance_exp'))
             }
-        if fetch_quarterly and 'consolidated_quarterly' in result and 'data' in result['consolidated_quarterly']:
-            result['parent_quarterly'] = {
-                'stock_code': stock_code,
-                'stock_name': stock_info['name'],
-                'report_type': 'parent',
-                'frequency': 'quarterly',
-                'years': years,
-                'fetch_time': datetime.now().isoformat(),
-                'data': result['consolidated_quarterly']['data'],
-                'note': '母公司报表数据暂不可用，使用合并报表数据代替'
-            }
-            
+            records.append(record)
+        
+        return records
     except Exception as e:
-        logger.error(f"获取母公司利润表失败: {e}")
-        if fetch_yearly:
-            result['parent_yearly'] = {'error': str(e)}
-        if fetch_quarterly:
-            result['parent_quarterly'] = {'error': str(e)}
+        print(f"获取利润表失败: {e}")
+        return []
+
+
+def main():
+    parser = argparse.ArgumentParser(description='获取利润表数据')
+    parser.add_argument('stock_code', help='股票代码（如 600519.SH 或 600519）')
+    parser.add_argument('--token', help='Tushare API token')
+    parser.add_argument('--years', type=int, default=5, help='历史数据年数（默认5年）')
     
-    # 保存所有4个 JSON 文件
-    for key, data in result.items():
-        output_file = output_dir / f"{stock_code}_income_statement_{key}.json"
-        save_json(data, output_file)
-        logger.info(f"已保存 {key} 利润表到 {output_file}")
+    args = parser.parse_args()
     
-    return result
+    # 初始化 API
+    pro = get_tushare_api(args.token)
+    
+    # 标准化股票代码
+    ts_code = normalize_stock_code(args.stock_code)
+    print(f"正在获取 {ts_code} 的利润表数据...")
+    
+    # 获取数据
+    income_data = get_income_statement(pro, ts_code, args.years)
+    
+    if not income_data:
+        print("未获取到利润表数据")
+        sys.exit(1)
+    
+    # 保存数据
+    filename = f"{ts_code.replace('.', '_')}_income_statement.json"
+    filepath = save_json(income_data, filename)
+    
+    print(f"\n数据已保存到: {filepath}")
+    print(f"共获取 {len(income_data)} 期数据")
+    
+    # 显示最新一期数据
+    if income_data:
+        latest = income_data[0]
+        print("\n=== 最新利润表摘要 ===")
+        print(f"报告期: {latest.get('end_date')}")
+        print(f"营业收入: {latest.get('revenue') / 10000:.2f} 亿元")
+        print(f"营业成本: {latest.get('total_cogs') / 10000:.2f} 亿元")
+        print(f"营业利润: {latest.get('operate_profit') / 10000:.2f} 亿元")
+        print(f"利润总额: {latest.get('total_profit') / 10000:.2f} 亿元")
+        print(f"净利润: {latest.get('net_income') / 10000:.2f} 亿元")
+        print(f"归母净利润: {latest.get('net_income_attr_p') / 10000:.2f} 亿元")
+        print(f"基本每股收益: {latest.get('basic_eps'):.2f} 元")
+        print(f"销售费用: {latest.get('sell_exp') / 10000:.2f} 亿元")
+        print(f"管理费用: {latest.get('manage_exp') / 10000:.2f} 亿元")
+        print(f"研发费用: {latest.get('research_exp') / 10000:.2f} 亿元")
+        print(f"财务费用: {latest.get('finance_exp') / 10000:.2f} 亿元")
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='获取利润表数据')
-    parser.add_argument('stock_code', help='股票代码（如 600519）')
-    parser.add_argument('--years', type=int, default=5, help='年数（默认: 5）')
-    parser.add_argument('--frequency', choices=['yearly', 'quarterly', 'both'], default='both',
-                       help='数据频率: yearly(年度), quarterly(季度), both(两者，默认)')
-    parser.add_argument('--output-dir', type=Path,
-                       default=None,
-                       help='输出目录（默认：FINDERS_WORKSPACE/data）')
-    args = parser.parse_args()
-    
-    get_income_statement(args.stock_code, args.years, args.frequency, args.output_dir)
+    main()

@@ -1,231 +1,269 @@
+#!/usr/bin/env python3
 """获取公司综合基本面数据"""
+
 import argparse
 import sys
-from pathlib import Path
 from datetime import datetime
-import pandas as pd
-import akshare as ak
 
-sys.path.insert(0, str(Path(__file__).parent))
-from utils import validate_stock_code, save_json, fetch_with_retry, clean_financial_data, setup_logger, get_data_dir
+from utils import (
+    get_tushare_api,
+    normalize_stock_code,
+    save_json,
+    get_date_range,
+    safe_float,
+    format_number
+)
 
-logger = setup_logger(__name__)
+
+def get_stock_basic(pro, ts_code):
+    """获取股票基本信息"""
+    try:
+        df = pro.stock_basic(ts_code=ts_code, fields='ts_code,name,industry,market,list_date')
+        if df.empty:
+            return None
+        return df.iloc[0].to_dict()
+    except Exception as e:
+        print(f"获取股票基本信息失败: {e}")
+        return None
 
 
-def get_fundamentals(stock_code: str, output_dir: Path = None) -> dict:
-    """
-    获取股票的综合基本面数据。
+def get_daily_basic(pro, ts_code):
+    """获取每日基本面指标（PE、PB、市值等）"""
+    try:
+        # 获取最新交易日的数据
+        df = pro.daily_basic(ts_code=ts_code, fields='ts_code,trade_date,pe,pe_ttm,pb,ps,ps_ttm,dv_ratio,dv_tts,total_mv,circ_mv')
+        if df.empty:
+            return None
+        
+        # 取最新一条记录
+        latest = df.iloc[0].to_dict()
+        return {
+            'pe': safe_float(latest.get('pe')),
+            'pe_ttm': safe_float(latest.get('pe_ttm')),
+            'pb': safe_float(latest.get('pb')),
+            'ps': safe_float(latest.get('ps')),
+            'ps_ttm': safe_float(latest.get('ps_ttm')),
+            'dv_ratio': safe_float(latest.get('dv_ratio')),  # 股息率
+            'total_mv': safe_float(latest.get('total_mv')),  # 总市值（万元）
+            'circ_mv': safe_float(latest.get('circ_mv')),    # 流通市值（万元）
+            'trade_date': latest.get('trade_date')
+        }
+    except Exception as e:
+        print(f"获取每日指标失败: {e}")
+        return None
+
+
+def get_financial_indicators(pro, ts_code, years=5):
+    """获取财务指标数据"""
+    try:
+        start_date, end_date = get_date_range(years)
+        
+        # 获取财务指标
+        df = pro.fina_indicator(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields='ts_code,ann_date,end_date,eps,dt_eps,bps,roe,roa,gross_profit_margin,net_profit_margin,debt_to_assets,current_ratio,quick_ratio,op_yoy,dt_netprofit_yoy,or_yoy'
+        )
+        
+        if df.empty:
+            return None
+        
+        # 取最新一期数据
+        latest = df.iloc[0].to_dict()
+        return {
+            'eps': safe_float(latest.get('eps')),
+            'bps': safe_float(latest.get('bps')),
+            'roe': safe_float(latest.get('roe')),
+            'roa': safe_float(latest.get('roa')),
+            'gross_profit_margin': safe_float(latest.get('gross_profit_margin')),
+            'net_profit_margin': safe_float(latest.get('net_profit_margin')),
+            'debt_to_assets': safe_float(latest.get('debt_to_assets')),
+            'current_ratio': safe_float(latest.get('current_ratio')),
+            'quick_ratio': safe_float(latest.get('quick_ratio')),
+            'op_yoy': safe_float(latest.get('op_yoy')),  # 营业收入同比增长
+            'dt_netprofit_yoy': safe_float(latest.get('dt_netprofit_yoy')),  # 净利润同比增长
+            'or_yoy': safe_float(latest.get('or_yoy')),  # 营业收入同比增长
+            'end_date': latest.get('end_date')
+        }
+    except Exception as e:
+        print(f"获取财务指标失败: {e}")
+        return None
+
+
+def get_income_summary(pro, ts_code, years=5):
+    """获取利润表摘要"""
+    try:
+        start_date, end_date = get_date_range(years)
+        
+        df = pro.income(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields='ts_code,ann_date,end_date,revenue,operate_profit,total_profit,n_income,n_income_attr_p'
+        )
+        
+        if df.empty:
+            return None
+        
+        # 取最新一期数据
+        latest = df.iloc[0].to_dict()
+        return {
+            'revenue': safe_float(latest.get('revenue')),
+            'operate_profit': safe_float(latest.get('operate_profit')),
+            'total_profit': safe_float(latest.get('total_profit')),
+            'net_income': safe_float(latest.get('n_income')),
+            'net_income_attr_p': safe_float(latest.get('n_income_attr_p')),
+            'end_date': latest.get('end_date')
+        }
+    except Exception as e:
+        print(f"获取利润表摘要失败: {e}")
+        return None
+
+
+def get_balance_sheet_summary(pro, ts_code, years=5):
+    """获取资产负债表摘要"""
+    try:
+        start_date, end_date = get_date_range(years)
+        
+        df = pro.balancesheet(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields='ts_code,ann_date,end_date,total_assets,total_liab,total_hldr_eqy_exc_min_int'
+        )
+        
+        if df.empty:
+            return None
+        
+        # 取最新一期数据
+        latest = df.iloc[0].to_dict()
+        return {
+            'total_assets': safe_float(latest.get('total_assets')),
+            'total_liab': safe_float(latest.get('total_liab')),
+            'total_equity': safe_float(latest.get('total_hldr_eqy_exc_min_int')),
+            'end_date': latest.get('end_date')
+        }
+    except Exception as e:
+        print(f"获取资产负债表摘要失败: {e}")
+        return None
+
+
+def get_cashflow_summary(pro, ts_code, years=5):
+    """获取现金流量表摘要"""
+    try:
+        start_date, end_date = get_date_range(years)
+        
+        df = pro.cashflow(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields='ts_code,ann_date,end_date,n_cashflow_act,n_cashflow_inv_act,n_cash_flows_fnc_act'
+        )
+        
+        if df.empty:
+            return None
+        
+        # 取最新一期数据
+        latest = df.iloc[0].to_dict()
+        return {
+            'operating_cashflow': safe_float(latest.get('n_cashflow_act')),
+            'investing_cashflow': safe_float(latest.get('n_cashflow_inv_act')),
+            'financing_cashflow': safe_float(latest.get('n_cash_flows_fnc_act')),
+            'end_date': latest.get('end_date')
+        }
+    except Exception as e:
+        print(f"获取现金流量表摘要失败: {e}")
+        return None
+
+
+def main():
+    parser = argparse.ArgumentParser(description='获取公司综合基本面数据')
+    parser.add_argument('stock_code', help='股票代码（如 600519.SH 或 600519）')
+    parser.add_argument('--token', help='Tushare API token')
+    parser.add_argument('--years', type=int, default=5, help='历史数据年数（默认5年）')
     
-    Args:
-        stock_code: 6位股票代码
-        output_dir: JSON 输出目录
+    args = parser.parse_args()
     
-    Returns:
-        包含所有基本面数据的字典
-    """
-    if output_dir is None:
-        output_dir = get_data_dir()
+    # 初始化 API
+    pro = get_tushare_api(args.token)
     
-    stock_info = validate_stock_code(stock_code)
-    logger.info(f"正在获取 {stock_info['name']} ({stock_code}) 的基本面数据")
+    # 标准化股票代码
+    ts_code = normalize_stock_code(args.stock_code)
+    print(f"正在获取 {ts_code} 的基本面数据...")
     
-    result = {
-        'stock_code': stock_code,
-        'stock_name': stock_info['name'],
-        'fetch_time': datetime.now().isoformat(),
-        'company_profile': {},
-        'valuation': {},
-        'dividend_risk': {},
-        'price_range': {},
-        'profitability': {},
-        'returns': {},
-        'financial_health': {}
+    # 获取各项数据
+    print("获取股票基本信息...")
+    basic_info = get_stock_basic(pro, ts_code)
+    if not basic_info:
+        print("无法获取股票基本信息，请检查股票代码是否正确")
+        sys.exit(1)
+    
+    print("获取每日指标...")
+    daily_basic = get_daily_basic(pro, ts_code)
+    
+    print("获取财务指标...")
+    financial_indicators = get_financial_indicators(pro, ts_code, args.years)
+    
+    print("获取利润表摘要...")
+    income_summary = get_income_summary(pro, ts_code, args.years)
+    
+    print("获取资产负债表摘要...")
+    balance_summary = get_balance_sheet_summary(pro, ts_code, args.years)
+    
+    print("获取现金流量表摘要...")
+    cashflow_summary = get_cashflow_summary(pro, ts_code, args.years)
+    
+    # 整合数据
+    fundamentals = {
+        'stock_code': ts_code,
+        'update_time': datetime.now().isoformat(),
+        'basic_info': basic_info,
+        'valuation': daily_basic,
+        'financial_indicators': financial_indicators,
+        'income_summary': income_summary,
+        'balance_summary': balance_summary,
+        'cashflow_summary': cashflow_summary
     }
     
-    # 1. 获取个股信息（总市值、行业等）
-    try:
-        stock_individual = fetch_with_retry(
-            ak.stock_individual_info_em,
-            symbol=stock_code
-        )
-        for _, row in stock_individual.iterrows():
-            indicator = str(row['item'])
-            value = row['value']
-            
-            if indicator == '总市值':
-                result['company_profile']['market_cap'] = float(value) if value else None
-            elif indicator == '行业':
-                result['company_profile']['industry'] = value
-            elif indicator == '市盈率(动态)':
-                result['valuation']['pe_ratio_ttm'] = float(value) if value else None
-            elif indicator == '市净率':
-                result['valuation']['price_to_book'] = float(value) if value else None
-            elif indicator == '总股本':
-                result['company_profile']['total_shares'] = float(value) if value else None
-            elif indicator == '流通股':
-                result['company_profile']['float_shares'] = float(value) if value else None
-    except Exception as e:
-        logger.error(f"获取个股信息失败: {e}")
+    # 保存数据
+    filename = f"{ts_code.replace('.', '_')}_fundamentals.json"
+    filepath = save_json(fundamentals, filename)
     
-    # 2. 获取财务分析指标
-    try:
-        financial = fetch_with_retry(
-            ak.stock_financial_abstract_ths,
-            symbol=stock_code,
-            indicator="按年度"
-        )
-        if not financial.empty:
-            latest = financial.iloc[0]
-            result['returns']['return_on_equity'] = _safe_float(latest.get('净资产收益率'))
-            result['profitability']['gross_profit_margin'] = _safe_float(latest.get('销售毛利率'))
-            result['profitability']['net_profit_margin'] = _safe_float(latest.get('销售净利率'))
-            result['financial_health']['debt_to_equity'] = _safe_float(latest.get('资产负债率'))
-    except Exception as e:
-        logger.error(f"获取财务指标失败: {e}")
+    print(f"\n数据已保存到: {filepath}")
+    print("\n=== 基本面概览 ===")
+    print(f"公司名称: {basic_info.get('name')}")
+    print(f"所属行业: {basic_info.get('industry')}")
     
-    # 3. 获取实时行情（PE、PB等）
-    try:
-        spot = fetch_with_retry(ak.stock_zh_a_spot_em)
-        row = spot[spot['代码'] == stock_code]
-        if not row.empty:
-            r = row.iloc[0]
-            result['valuation']['pe_ratio_ttm'] = _safe_float(r.get('市盈率-动态'))
-            result['valuation']['price_to_book'] = _safe_float(r.get('市净率'))
-            result['company_profile']['market_cap'] = _safe_float(r.get('总市值'))
-            result['price_range']['current_price'] = _safe_float(r.get('最新价'))
-            result['price_range']['year_1_high'] = _safe_float(r.get('52最高'))
-            result['price_range']['year_1_low'] = _safe_float(r.get('52最低'))
-            result['price_range']['day_60_average'] = _safe_float(r.get('60日涨跌幅'))
-    except Exception as e:
-        logger.error(f"获取实时行情失败: {e}")
+    if daily_basic:
+        print(f"\n估值指标:")
+        print(f"  PE (TTM): {format_number(daily_basic.get('pe_ttm'))}")
+        print(f"  PB: {format_number(daily_basic.get('pb'))}")
+        print(f"  股息率: {format_number(daily_basic.get('dv_ratio'))}%")
+        print(f"  总市值: {format_number(daily_basic.get('total_mv') / 10000)}亿元")
     
-    # 4. 获取历史价格数据计算均线
-    try:
-        price_data = fetch_with_retry(
-            ak.stock_zh_a_hist,
-            symbol=stock_code,
-            period="daily",
-            adjust="qfq"
-        )
-        if not price_data.empty:
-            close = price_data['收盘'].astype(float)
-            result['price_range']['day_60_average'] = round(float(close.tail(60).mean()), 2)
-            result['price_range']['day_180_average'] = round(float(close.tail(180).mean()), 2)
-            
-            recent_252 = close.tail(252)  # 约1年交易日
-            result['price_range']['year_1_high'] = round(float(recent_252.max()), 2)
-            result['price_range']['year_1_low'] = round(float(recent_252.min()), 2)
-    except Exception as e:
-        logger.error(f"获取历史价格失败: {e}")
+    if financial_indicators:
+        print(f"\n盈利能力:")
+        print(f"  ROE: {format_number(financial_indicators.get('roe'))}%")
+        print(f"  ROA: {format_number(financial_indicators.get('roa'))}%")
+        print(f"  毛利率: {format_number(financial_indicators.get('gross_profit_margin'))}%")
+        print(f"  净利率: {format_number(financial_indicators.get('net_profit_margin'))}%")
+        print(f"\n成长能力:")
+        print(f"  营收同比增长: {format_number(financial_indicators.get('or_yoy'))}%")
+        print(f"  净利润同比增长: {format_number(financial_indicators.get('dt_netprofit_yoy'))}%")
     
-    # 5. 获取利润表数据（计算利润率等）
-    try:
-        profit = fetch_with_retry(
-            ak.stock_profit_sheet_by_report_em,
-            symbol=stock_code
-        )
-        if not profit.empty:
-            latest = profit.iloc[0]
-            result['profitability']['revenue_ttm'] = _safe_float(latest.get('TOTAL_OPERATE_INCOME'))
-            result['profitability']['operating_profit'] = _safe_float(latest.get('OPERATE_PROFIT'))
-            result['profitability']['net_income'] = _safe_float(latest.get('NETPROFIT'))
-            result['profitability']['ebitda'] = _safe_float(latest.get('TOTAL_PROFIT'))
-            
-            revenue = _safe_float(latest.get('TOTAL_OPERATE_INCOME'))
-            net_income = _safe_float(latest.get('NETPROFIT'))
-            if revenue and net_income and revenue != 0:
-                result['profitability']['profit_margin'] = round(net_income / revenue * 100, 2)
-    except Exception as e:
-        logger.error(f"获取利润表数据失败: {e}")
+    if balance_summary:
+        print(f"\n财务健康:")
+        print(f"  总资产: {format_number(balance_summary.get('total_assets') / 10000)}亿元")
+        print(f"  总负债: {format_number(balance_summary.get('total_liab') / 10000)}亿元")
+        print(f"  净资产: {format_number(balance_summary.get('total_equity') / 10000)}亿元")
     
-    # 6. 获取资产负债表数据（计算流动比率等）
-    try:
-        balance = fetch_with_retry(
-            ak.stock_balance_sheet_by_report_em,
-            symbol=stock_code
-        )
-        if not balance.empty:
-            latest = balance.iloc[0]
-            result['financial_health']['total_assets'] = _safe_float(latest.get('TOTAL_ASSETS'))
-            result['financial_health']['total_liabilities'] = _safe_float(latest.get('TOTAL_LIABILITIES'))
-            result['financial_health']['total_equity'] = _safe_float(latest.get('TOTAL_EQUITY'))
-            result['financial_health']['current_assets'] = _safe_float(latest.get('TOTAL_CURRENT_ASSETS'))
-            result['financial_health']['current_liabilities'] = _safe_float(latest.get('TOTAL_CURRENT_LIABILITIES'))
-            
-            current_assets = _safe_float(latest.get('TOTAL_CURRENT_ASSETS'))
-            current_liab = _safe_float(latest.get('TOTAL_CURRENT_LIABILITIES'))
-            if current_assets and current_liab and current_liab != 0:
-                result['financial_health']['current_ratio'] = round(current_assets / current_liab, 2)
-            
-            total_debt = _safe_float(latest.get('TOTAL_LIABILITIES'))
-            total_equity = _safe_float(latest.get('TOTAL_EQUITY'))
-            if total_debt and total_equity and total_equity != 0:
-                result['financial_health']['debt_to_equity'] = round(total_debt / total_equity * 100, 2)
-    except Exception as e:
-        logger.error(f"获取资产负债表数据失败: {e}")
-    
-    # 7. 获取现金流量表数据（计算自由现金流）
-    try:
-        cashflow = fetch_with_retry(
-            ak.stock_cash_flow_sheet_by_report_em,
-            symbol=stock_code
-        )
-        if not cashflow.empty:
-            latest = cashflow.iloc[0]
-            result['financial_health']['operating_cash_flow'] = _safe_float(
-                latest.get('NETCASH_OPERATE'))
-            result['financial_health']['investing_cash_flow'] = _safe_float(
-                latest.get('NETCASH_INVEST'))
-            result['financial_health']['financing_cash_flow'] = _safe_float(
-                latest.get('NETCASH_FINANCE'))
-            
-            op_cf = _safe_float(latest.get('NETCASH_OPERATE'))
-            # 自由现金流 ≈ 经营现金流 - 资本支出
-            if op_cf:
-                result['financial_health']['free_cash_flow'] = op_cf
-    except Exception as e:
-        logger.error(f"获取现金流量表数据失败: {e}")
-    
-    # 8. 获取股息数据
-    try:
-        dividend = fetch_with_retry(
-            ak.stock_history_dividend_detail,
-            symbol=stock_code,
-            indicator="分红"
-        )
-        if not dividend.empty:
-            result['dividend_risk']['has_dividend'] = True
-            result['dividend_risk']['recent_dividends'] = dividend.head(5).to_dict('records')
-        else:
-            result['dividend_risk']['has_dividend'] = False
-    except Exception as e:
-        logger.error(f"获取股息数据失败: {e}")
-    
-    # 保存 JSON
-    output_file = output_dir / f"{stock_code}_fundamentals.json"
-    save_json(result, output_file)
-    logger.info(f"基本面数据已保存到 {output_file}")
-    
-    return result
-
-
-def _safe_float(value) -> float | None:
-    """安全转换为 float，处理 None 和无效值"""
-    if value is None:
-        return None
-    try:
-        v = float(value)
-        return v if pd.notna(v) else None
-    except (ValueError, TypeError):
-        return None
+    if cashflow_summary:
+        print(f"\n现金流量:")
+        print(f"  经营现金流: {format_number(cashflow_summary.get('operating_cashflow') / 10000)}亿元")
+        print(f"  投资现金流: {format_number(cashflow_summary.get('investing_cashflow') / 10000)}亿元")
+        print(f"  筹资现金流: {format_number(cashflow_summary.get('financing_cashflow') / 10000)}亿元")
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='获取公司基本面数据')
-    parser.add_argument('stock_code', help='股票代码（如 600519）')
-    parser.add_argument('--output-dir', type=Path,
-                       default=None,
-                       help='输出目录（默认：FINDERS_WORKSPACE/data）')
-    args = parser.parse_args()
-    
-    get_fundamentals(args.stock_code, args.output_dir)
+    main()

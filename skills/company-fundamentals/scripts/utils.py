@@ -1,153 +1,101 @@
-"""共享工具模块：验证、数据获取、清洗、JSON I/O、日志"""
-import json
-import logging
+#!/usr/bin/env python3
+"""工具函数模块"""
+
 import os
-import time
+import json
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Any
+
+import tushare as ts
 import pandas as pd
-import akshare as ak
 
 
-def get_data_dir() -> Path:
-    """
-    获取数据存储目录。
+def get_tushare_api(token=None):
+    """获取 tushare API 实例"""
+    if token is None:
+        token = os.getenv('TUSHARE_TOKEN')
+        if not token:
+            raise ValueError("请设置 TUSHARE_TOKEN 环境变量或传入 token 参数")
+    return ts.pro_api(token)
+
+
+def normalize_stock_code(code):
+    """标准化股票代码为 tushare 格式（带交易所后缀）"""
+    code = code.strip().upper()
     
-    优先使用 FINDERS_WORKSPACE 环境变量，默认为 ~/.finders/workspace
+    # 如果已经带后缀，直接返回
+    if code.endswith('.SH') or code.endswith('.SZ') or code.endswith('.BJ'):
+        return code
     
-    Returns:
-        Path: 数据目录路径 (FINDERS_WORKSPACE/data)
-    """
-    workspace = os.environ.get("FINDERS_WORKSPACE")
-    if workspace:
-        base_dir = Path(workspace).expanduser().resolve()
+    # 根据代码规则添加后缀
+    # 上海证券交易所：600xxx, 601xxx, 603xxx, 688xxx
+    # 深圳证券交易所：000xxx, 002xxx, 300xxx
+    # 北京证券交易所：8xxxxx, 4xxxxx
+    
+    if code.startswith(('600', '601', '603', '688')):
+        return f"{code}.SH"
+    elif code.startswith(('000', '002', '300')):
+        return f"{code}.SZ"
+    elif code.startswith(('8', '4')):
+        return f"{code}.BJ"
     else:
-        base_dir = Path.home() / ".finders" / "workspace"
-    
-    data_dir = base_dir / "data"
+        # 默认尝试深交所
+        return f"{code}.SZ"
+
+
+def get_workspace_data_dir():
+    """获取工作空间数据目录"""
+    workspace = os.getenv('FINDERS_WORKSPACE', str(Path.home() / '.finders' / 'workspace'))
+    data_dir = Path(workspace) / 'data'
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
 
-def validate_stock_code(stock_code: str) -> dict:
-    """
-    验证股票代码并返回公司信息。
-    
-    Args:
-        stock_code: 6位股票代码（如 '600519'）
-    
-    Returns:
-        dict: 包含 code, name, market 的字典
-        
-    Raises:
-        ValueError: 当股票代码无效时
-    """
-    stock_info = ak.stock_info_a_code_name()
-    stock_row = stock_info[stock_info['code'] == stock_code]
-    
-    if stock_row.empty:
-        raise ValueError(f"股票代码 '{stock_code}' 在A股市场中不存在")
-    
-    stock_name = stock_row.iloc[0]['name']
-    market = 'SH' if stock_code.startswith('6') else 'SZ'
-    
-    return {
-        'code': stock_code,
-        'name': stock_name,
-        'market': market
-    }
-
-
-def save_json(data: dict, filepath: Path) -> None:
-    """
-    保存数据为 JSON 文件（UTF-8 编码）。
-    
-    Args:
-        data: 要保存的字典
-        filepath: 输出文件路径
-    """
-    filepath.parent.mkdir(parents=True, exist_ok=True)
+def save_json(data, filename):
+    """保存数据为 JSON 文件"""
+    data_dir = get_workspace_data_dir()
+    filepath = data_dir / filename
     with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+    return filepath
 
 
-def fetch_with_retry(func: Callable, max_retries: int = 3, **kwargs) -> Any:
-    """
-    执行函数，带重试逻辑和指数退避。
-    
-    Args:
-        func: 要执行的函数
-        max_retries: 最大重试次数
-        **kwargs: 传递给函数的参数
-    
-    Returns:
-        函数返回值
-        
-    Raises:
-        Exception: 如果所有重试都失败
-    """
-    last_exception = None
-    
-    for attempt in range(max_retries):
-        try:
-            return func(**kwargs)
-        except Exception as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                sleep_time = 2 ** attempt  # 1s, 2s, 4s
-                logging.warning(f"第 {attempt + 1} 次尝试失败: {e}。{sleep_time}秒后重试...")
-                time.sleep(sleep_time)
-    
-    raise last_exception
+def load_json(filename):
+    """从 JSON 文件加载数据"""
+    data_dir = get_workspace_data_dir()
+    filepath = data_dir / filename
+    if not filepath.exists():
+        return None
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 
-def clean_financial_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    清洗财务数据以便 JSON 序列化。
-    
-    - 将 NaN 转换为 None
-    - 标准化日期格式
-    - 确保数值类型
-    
-    Args:
-        df: 要清洗的 DataFrame
-    
-    Returns:
-        清洗后的 DataFrame
-    """
-    df = df.copy()
-    
-    # 将 NaN 转换为 None 以便 JSON 序列化
-    df = df.where(pd.notnull(df), None)
-    
-    # 将日期列转换为字符串格式
-    date_cols = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
-    for col in date_cols:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col]).dt.strftime('%Y-%m-%d')
-    
-    return df
+def get_date_range(years=5):
+    """获取日期范围"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=years * 365)
+    return start_date.strftime('%Y%m%d'), end_date.strftime('%Y%m%d')
 
 
-def setup_logger(script_name: str) -> logging.Logger:
-    """
-    设置日志记录器，使用一致的格式。
-    
-    Args:
-        script_name: 脚本/模块名称
-    
-    Returns:
-        配置好的日志记录器
-    """
-    logger = logging.getLogger(script_name)
-    logger.setLevel(logging.INFO)
-    
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    
-    return logger
+def df_to_dict(df):
+    """将 DataFrame 转换为字典列表"""
+    if df is None or df.empty:
+        return []
+    return df.to_dict('records')
+
+
+def safe_float(value, default=0.0):
+    """安全的浮点数转换"""
+    try:
+        if pd.isna(value):
+            return default
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def format_number(value, decimals=2):
+    """格式化数字显示"""
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{value:,.{decimals}f}"
