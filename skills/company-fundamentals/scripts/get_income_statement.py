@@ -171,16 +171,16 @@ def main():
         operate_profit = latest.get('营业利润') or 0
         total_profit = latest.get('利润总额') or 0
         n_income = latest.get('净利润(不含少数股东损益)') or 0
-        print(f"营业收入: {revenue / 100000000:.2f} 亿元")
-        print(f"营业成本: {oper_cost / 100000000:.2f} 亿元")
-        print(f"营业利润: {operate_profit / 100000000:.2f} 亿元")
-        print(f"利润总额: {total_profit / 100000000:.2f} 亿元")
-        print(f"净利润(不含少数): {n_income / 100000000:.2f} 亿元")
+        print(f"营业收入: {revenue / 10000:.2f} 万元")
+        print(f"营业成本: {oper_cost / 10000:.2f} 万元")
+        print(f"营业利润: {operate_profit / 10000:.2f} 万元")
+        print(f"利润总额: {total_profit / 10000:.2f} 万元")
+        print(f"净利润(不含少数): {n_income / 10000:.2f} 万元")
         print(f"基本每股收益: {latest.get('基本每股收益') or 0:.2f} 元")
-        print(f"销售费用: {(latest.get('销售费用') or 0) / 100000000:.2f} 亿元")
-        print(f"管理费用: {(latest.get('管理费用') or 0) / 100000000:.2f} 亿元")
-        print(f"研发费用: {(latest.get('研发费用') or 0) / 100000000:.2f} 亿元")
-        print(f"财务费用: {(latest.get('财务费用') or 0) / 100000000:.2f} 亿元")
+        print(f"销售费用: {(latest.get('销售费用') or 0) / 10000:.2f} 万元")
+        print(f"管理费用: {(latest.get('管理费用') or 0) / 10000:.2f} 万元")
+        print(f"研发费用: {(latest.get('研发费用') or 0) / 10000:.2f} 万元")
+        print(f"财务费用: {(latest.get('财务费用') or 0) / 10000:.2f} 万元")
 
 
 if __name__ == '__main__':

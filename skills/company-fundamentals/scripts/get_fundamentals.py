@@ -238,15 +238,15 @@ def main():
 
     if balance_summary:
         print(f"\n财务健康:")
-        print(f"  总资产: {format_number(balance_summary.get('total_assets') / 100000000)}亿元")
-        print(f"  总负债: {format_number(balance_summary.get('total_liab') / 100000000)}亿元")
-        print(f"  净资产: {format_number(balance_summary.get('total_equity') / 100000000)}亿元")
+        print(f"  总资产: {format_number(balance_summary.get('total_assets') / 10000)}万元")
+        print(f"  总负债: {format_number(balance_summary.get('total_liab') / 10000)}万元")
+        print(f"  净资产: {format_number(balance_summary.get('total_equity') / 10000)}万元")
 
     if cashflow_summary:
         print(f"\n现金流量:")
-        print(f"  经营现金流: {format_number(cashflow_summary.get('operating_cashflow') / 100000000)}亿元")
-        print(f"  投资现金流: {format_number(cashflow_summary.get('investing_cashflow') / 100000000)}亿元")
-        print(f"  筹资现金流: {format_number(cashflow_summary.get('financing_cashflow') / 100000000)}亿元")
+        print(f"  经营现金流: {format_number(cashflow_summary.get('operating_cashflow') / 10000)}万元")
+        print(f"  投资现金流: {format_number(cashflow_summary.get('investing_cashflow') / 10000)}万元")
+        print(f"  筹资现金流: {format_number(cashflow_summary.get('financing_cashflow') / 10000)}万元")
 
 
 if __name__ == '__main__':
