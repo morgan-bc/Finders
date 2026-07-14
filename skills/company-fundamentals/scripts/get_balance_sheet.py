@@ -130,7 +130,7 @@ FIELD_MAP = {
 
 
 def get_balance_sheet(pro, ts_code, start_date, end_date):
-    """获取资产负债表完整数据（单位：万元）"""
+    """获取资产负债表完整数据"""
     try:
         df = pro.balancesheet(
             ts_code=ts_code,
@@ -144,7 +144,7 @@ def get_balance_sheet(pro, ts_code, start_date, end_date):
         # 将英文列名重命名为中文
         df = df.rename(columns=FIELD_MAP)
 
-        # 转换为字典列表，数值从元转为万元
+        # 转换为字典列表，安全处理数值
         records = []
         for _, row in df.iterrows():
             record = {}
@@ -153,8 +153,7 @@ def get_balance_sheet(pro, ts_code, start_date, end_date):
                 if col in ('股票代码', '公告日期', '实际公告日期', '报告期', '报表类型', '公司类型', '报告期类型'):
                     record[col] = str(val) if val is not None else None
                 else:
-                    num_val = safe_float(val)
-                    record[col] = num_val / 10000 if num_val is not None else None
+                    record[col] = safe_float(val)
             records.append(record)
 
         return records
