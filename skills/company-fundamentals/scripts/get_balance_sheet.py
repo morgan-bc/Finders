@@ -130,7 +130,7 @@ FIELD_MAP = {
 
 
 def get_balance_sheet(pro, ts_code, start_date, end_date):
-    """获取资产负债表完整数据"""
+    """获取资产负债表完整数据（单位：万元）"""
     try:
         df = pro.balancesheet(
             ts_code=ts_code,
@@ -144,7 +144,7 @@ def get_balance_sheet(pro, ts_code, start_date, end_date):
         # 将英文列名重命名为中文
         df = df.rename(columns=FIELD_MAP)
 
-        # 转换为字典列表，安全处理数值
+        # 转换为字典列表，数值从元转为万元
         records = []
         for _, row in df.iterrows():
             record = {}
@@ -153,7 +153,8 @@ def get_balance_sheet(pro, ts_code, start_date, end_date):
                 if col in ('股票代码', '公告日期', '实际公告日期', '报告期', '报表类型', '公司类型', '报告期类型'):
                     record[col] = str(val) if val is not None else None
                 else:
-                    record[col] = safe_float(val)
+                    num_val = safe_float(val)
+                    record[col] = num_val / 10000 if num_val is not None else None
             records.append(record)
 
         return records
@@ -199,15 +200,15 @@ def main():
         total_assets = latest.get('资产总计') or 0
         total_liab = latest.get('负债合计') or 0
         total_equity = latest.get('股东权益合计(不含少数股东权益)') or 0
-        print(f"资产总计: {total_assets / 100000000:.2f} 亿元")
-        print(f"负债合计: {total_liab / 100000000:.2f} 亿元")
-        print(f"股东权益(不含少数): {total_equity / 100000000:.2f} 亿元")
-        print(f"货币资金: {(latest.get('货币资金') or 0) / 100000000:.2f} 亿元")
-        print(f"应收账款: {(latest.get('应收账款') or 0) / 100000000:.2f} 亿元")
-        print(f"存货: {(latest.get('存货') or 0) / 100000000:.2f} 亿元")
-        print(f"固定资产: {(latest.get('固定资产') or 0) / 100000000:.2f} 亿元")
-        print(f"短期借款: {(latest.get('短期借款') or 0) / 100000000:.2f} 亿元")
-        print(f"长期借款: {(latest.get('长期借款') or 0) / 100000000:.2f} 亿元")
+        print(f"资产总计: {total_assets:.2f} 万元")
+        print(f"负债合计: {total_liab:.2f} 万元")
+        print(f"股东权益(不含少数): {total_equity:.2f} 万元")
+        print(f"货币资金: {latest.get('货币资金') or 0:.2f} 万元")
+        print(f"应收账款: {latest.get('应收账款') or 0:.2f} 万元")
+        print(f"存货: {latest.get('存货') or 0:.2f} 万元")
+        print(f"固定资产: {latest.get('固定资产') or 0:.2f} 万元")
+        print(f"短期借款: {latest.get('短期借款') or 0:.2f} 万元")
+        print(f"长期借款: {latest.get('长期借款') or 0:.2f} 万元")
 
 
 if __name__ == '__main__':
