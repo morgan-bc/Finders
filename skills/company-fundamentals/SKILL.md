@@ -44,7 +44,7 @@ allowed-tools: "read_file write_file execute web_search"
 运行 `get_fundamentals.py` 获取概览数据：
 
 ```bash
-python skills/company-fundamentals/scripts/get_fundamentals.py <股票代码>
+python skills/company-fundamentals/scripts/get_fundamentals.py <股票代码> --start_date <YYYYMMDD> --end_date <YYYYMMDD>
 ```
 
 提供以下信息：
@@ -62,17 +62,17 @@ python skills/company-fundamentals/scripts/get_fundamentals.py <股票代码>
 
 **资产负债表分析：**
 ```bash
-python skills/company-fundamentals/scripts/get_balance_sheet.py <股票代码> --years 5
+python skills/company-fundamentals/scripts/get_balance_sheet.py <股票代码> --start_date <YYYYMMDD> --end_date <YYYYMMDD>
 ```
 
 **现金流量表分析：**
 ```bash
-python skills/company-fundamentals/scripts/get_cashflow.py <股票代码> --years 5
+python skills/company-fundamentals/scripts/get_cashflow.py <股票代码> --start_date <YYYYMMDD> --end_date <YYYYMMDD>
 ```
 
 **利润表分析：**
 ```bash
-python skills/company-fundamentals/scripts/get_income_statement.py <股票代码> --years 5
+python skills/company-fundamentals/scripts/get_income_statement.py <股票代码> --start_date <YYYYMMDD> --end_date <YYYYMMDD>
 ```
 
 ### 步骤 3：生成分析报告
@@ -127,6 +127,6 @@ python skills/company-fundamentals/scripts/get_income_statement.py <股票代码
 - 仅在需要更深入分析时才深入挖掘
 - 数据源是通过 tushare 获取的专业金融数据
 - 所有数据仅适用于 A 股公司
-- 默认历史周期为 5 年（可通过 --years 参数配置）
+- 日期参数格式为 YYYYMMDD（如 20200101）
 - 在调用脚本之前，使用 `web_search` 将公司名称解析为股票代码
-- 需要配置 tushare token（通过环境变量 `TUSHARE_TOKEN` 或脚本参数）
+- 需要配置 tushare token（通过环境变量 `TUSHARE_TOKEN`）
