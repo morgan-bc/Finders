@@ -199,15 +199,15 @@ def main():
         total_assets = latest.get('资产总计') or 0
         total_liab = latest.get('负债合计') or 0
         total_equity = latest.get('股东权益合计(不含少数股东权益)') or 0
-        print(f"资产总计: {total_assets / 10000:.2f} 亿元")
-        print(f"负债合计: {total_liab / 10000:.2f} 亿元")
-        print(f"股东权益(不含少数): {total_equity / 10000:.2f} 亿元")
-        print(f"货币资金: {(latest.get('货币资金') or 0) / 10000:.2f} 亿元")
-        print(f"应收账款: {(latest.get('应收账款') or 0) / 10000:.2f} 亿元")
-        print(f"存货: {(latest.get('存货') or 0) / 10000:.2f} 亿元")
-        print(f"固定资产: {(latest.get('固定资产') or 0) / 10000:.2f} 亿元")
-        print(f"短期借款: {(latest.get('短期借款') or 0) / 10000:.2f} 亿元")
-        print(f"长期借款: {(latest.get('长期借款') or 0) / 10000:.2f} 亿元")
+        print(f"资产总计: {total_assets / 100000000:.2f} 亿元")
+        print(f"负债合计: {total_liab / 100000000:.2f} 亿元")
+        print(f"股东权益(不含少数): {total_equity / 100000000:.2f} 亿元")
+        print(f"货币资金: {(latest.get('货币资金') or 0) / 100000000:.2f} 亿元")
+        print(f"应收账款: {(latest.get('应收账款') or 0) / 100000000:.2f} 亿元")
+        print(f"存货: {(latest.get('存货') or 0) / 100000000:.2f} 亿元")
+        print(f"固定资产: {(latest.get('固定资产') or 0) / 100000000:.2f} 亿元")
+        print(f"短期借款: {(latest.get('短期借款') or 0) / 100000000:.2f} 亿元")
+        print(f"长期借款: {(latest.get('长期借款') or 0) / 100000000:.2f} 亿元")
 
 
 if __name__ == '__main__':
