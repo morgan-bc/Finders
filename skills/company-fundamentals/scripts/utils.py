@@ -10,12 +10,11 @@ import tushare as ts
 import pandas as pd
 
 
-def get_tushare_api(token=None):
+def get_tushare_api():
     """获取 tushare API 实例"""
-    if token is None:
-        token = os.getenv('TUSHARE_TOKEN')
-        if not token:
-            raise ValueError("请设置 TUSHARE_TOKEN 环境变量或传入 token 参数")
+    token = os.getenv('TUSHARE_TOKEN')
+    if not token:
+        raise ValueError("请设置 TUSHARE_TOKEN 环境变量")
     return ts.pro_api(token)
 
 
@@ -70,11 +69,7 @@ def load_json(filename):
         return json.load(f)
 
 
-def get_date_range(years=5):
-    """获取日期范围"""
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=years * 365)
-    return start_date.strftime('%Y%m%d'), end_date.strftime('%Y%m%d')
+
 
 
 def df_to_dict(df):
@@ -84,8 +79,8 @@ def df_to_dict(df):
     return df.to_dict('records')
 
 
-def safe_float(value, default=0.0):
-    """安全的浮点数转换"""
+def safe_float(value, default=None):
+    """安全的浮点数转换，缺失值返回 None"""
     try:
         if pd.isna(value):
             return default
