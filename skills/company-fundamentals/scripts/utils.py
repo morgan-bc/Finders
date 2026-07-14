@@ -84,8 +84,8 @@ def df_to_dict(df):
     return df.to_dict('records')
 
 
-def safe_float(value, default=0.0):
-    """安全的浮点数转换"""
+def safe_float(value, default=None):
+    """安全的浮点数转换，缺失值返回 None"""
     try:
         if pd.isna(value):
             return default
