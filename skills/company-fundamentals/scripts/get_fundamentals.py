@@ -224,7 +224,7 @@ def main():
         print(f"  PE (TTM): {format_number(daily_basic.get('pe_ttm'))}")
         print(f"  PB: {format_number(daily_basic.get('pb'))}")
         print(f"  股息率: {format_number(daily_basic.get('dv_ratio'))}%")
-        print(f"  总市值: {format_number(daily_basic.get('total_mv') / 10000)}亿元")
+        print(f"  总市值: {format_number(daily_basic.get('total_mv') / 10000)}万元")
 
     if financial_indicators:
         print(f"\n盈利能力:")
