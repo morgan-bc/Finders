@@ -64,11 +64,21 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-## Project-specific (Finders)
+## Code Structure
 
-- Session data: `$FINDERS_WORKSPACE/sessions/chat.db` (langgraph-checkpoint-sqlite, WAL). TUI creates a unique `thread_id` per session; subagents use their own checkpointer.
-- `/session` picker (prompt_toolkit): `↑/↓` select, `Enter` load, `d` delete, `q`/`Esc` quit.
-- Render user/assistant messages with `rich.Markdown` — history and live must match; tool calls shown as `Tool: <name> (args)` (params only, never results).
-- `astream_events` always passes `config={"recursion_limit": ...}` (default 100).
-- Simple/factual questions: one `web_search`; independent tool calls are emitted in parallel in a single assistant turn.
-- No custom runners — call LangGraph `astream_events` directly.
+```
+src/finders/
+├── agents/          # Main agent: factory, system prompt
+├── api/             # FastAPI app + SSE routes
+├── cli/             # TUI (tui.py) + entry point (main.py)
+├── memory/          # Memory system
+├── middlewares/     # Custom middleware
+├── sandbox/         # Sandboxed execution
+├── skills/          # Skill loading + SkillsMiddleware
+├── subagents/       # Subagents: config, executor, builtins
+├── tools/           # Tool registry + implementations
+└── utils/           # Config, paths, checkpointing
+skills/              # Markdown skills
+```
+
+**Key conventions:** main agent is an orchestrator delegating via `task_tool`; call LangGraph `astream_events` directly (no custom runners); sessions stored in `$FINDERS_WORKSPACE/sessions/chat.db`; `astream_events` must pass `recursion_limit`, default 200.
