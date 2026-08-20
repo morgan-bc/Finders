@@ -60,9 +60,9 @@ async def task_tool(
         available = ", ".join(available_subagent_names)
         return f"Error: Unknown subagent type '{subagent_type}'. Available: {available}"
 
-    overrides: dict = {}
-    if overrides:
-        config = replace(config, **overrides)
+    # overrides: dict = {}
+    # if overrides:
+    #     config = replace(config, **overrides)
 
     settings = get_settings()
     parent_model = settings.agent.model

@@ -65,7 +65,7 @@ def _build_middleware(settings: Settings, allowed_skills: list[str] | None = Non
     ]
 
 
-def create_finders_agent(settings: Settings):
+def create_finders_agent(settings: Settings, checkpointer=None):
     """创建 Finders Agent 实例。"""
 
     model = settings.create_chat_model()
@@ -90,4 +90,5 @@ def create_finders_agent(settings: Settings):
         system_prompt=system_prompt,
         middleware=middleware,
         state_schema=SkillAgentState,
+        checkpointer=checkpointer,
     )

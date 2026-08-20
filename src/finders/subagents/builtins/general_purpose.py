@@ -34,5 +34,5 @@ When you complete the task, provide:
     tools=None,  # Inherit all tools from parent
     disallowed_tools=["task"],  # Prevent nesting
     model="inherit",
-    max_turns=50,
+    max_turns=1000,
 )

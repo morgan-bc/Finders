@@ -61,3 +61,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+## Project-specific (Finders)
+
+- Session data: `$FINDERS_WORKSPACE/sessions/chat.db` (langgraph-checkpoint-sqlite, WAL). TUI creates a unique `thread_id` per session; subagents use their own checkpointer.
+- `/session` picker (prompt_toolkit): `↑/↓` select, `Enter` load, `d` delete, `q`/`Esc` quit.
+- Render user/assistant messages with `rich.Markdown` — history and live must match; tool calls shown as `Tool: <name> (args)` (params only, never results).
+- `astream_events` always passes `config={"recursion_limit": ...}` (default 100).
+- Simple/factual questions: one `web_search`; independent tool calls are emitted in parallel in a single assistant turn.
+- No custom runners — call LangGraph `astream_events` directly.

@@ -24,7 +24,7 @@ This skill provides a systematic methodology for conducting thorough web researc
 
 - Creating presentations (PPT/slides)
 - Writing articles, reports, or documentation
-- Financial deep research and investment analysis
+- Deep Financial Research and investment analysis
 - Any content that requires real-world information, examples, or current data
 
 ## Core Principle

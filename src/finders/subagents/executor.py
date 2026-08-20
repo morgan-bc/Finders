@@ -109,7 +109,7 @@ class SubagentExecutor:
         
         return "\n\n".join(skill_section)
 
-    def _create_agent(self):
+    def _create_agent(self, checkpointer=None):
         """Create the agent instance."""
         settings = get_settings()
         model_name = self.parent_model if self.config.model == "inherit" else self.config.model
@@ -133,6 +133,7 @@ class SubagentExecutor:
             tools=self.tools,
             middleware=middlewares,
             system_prompt=system_prompt,
+            # checkpointer=checkpointer,
         )
 
     def _build_initial_state(self, task: str) -> dict[str, Any]:
@@ -155,33 +156,42 @@ class SubagentExecutor:
             )
 
         try:
-            agent = self._create_agent()
-            state = self._build_initial_state(task)
+            from finders.utils.checkpointing import open_saver
 
+            thread_id = result.task_id or str(uuid.uuid4())
+            state = self._build_initial_state(task)
             run_config = {
                 "recursion_limit": self.config.max_turns,
+                "configurable": {"thread_id": thread_id},
             }
 
-            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} starting async execution with max_turns={self.config.max_turns}")
+            logger.info(
+                f"[trace={self.trace_id}] Subagent {self.config.name} starting async "
+                f"execution with max_turns={self.config.max_turns} thread={thread_id}"
+            )
 
-            final_state = None
-            async for chunk in agent.astream(state, config=run_config, stream_mode="values"):
-                final_state = chunk
+            async with open_saver() as saver:
+                await saver.setup()
+                agent = self._create_agent(checkpointer=saver)
 
-                messages = chunk.get("messages", [])
-                if messages:
-                    last_message = messages[-1]
-                    if isinstance(last_message, AIMessage):
-                        message_dict = last_message.model_dump()
-                        message_id = message_dict.get("id")
-                        is_duplicate = False
-                        if message_id:
-                            is_duplicate = any(msg.get("id") == message_id for msg in result.ai_messages)
-                        else:
-                            is_duplicate = message_dict in result.ai_messages
+                final_state = None
+                async for chunk in agent.astream(state, config=run_config, stream_mode="values"):
+                    final_state = chunk
 
-                        if not is_duplicate:
-                            result.ai_messages.append(message_dict)
+                    messages = chunk.get("messages", [])
+                    if messages:
+                        last_message = messages[-1]
+                        if isinstance(last_message, AIMessage):
+                            message_dict = last_message.model_dump()
+                            message_id = message_dict.get("id")
+                            is_duplicate = False
+                            if message_id:
+                                is_duplicate = any(msg.get("id") == message_id for msg in result.ai_messages)
+                            else:
+                                is_duplicate = message_dict in result.ai_messages
+
+                            if not is_duplicate:
+                                result.ai_messages.append(message_dict)
 
             logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} completed async execution")
 

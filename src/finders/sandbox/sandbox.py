@@ -257,13 +257,13 @@ class LocalSandbox:
         project_skill_dir: Path | None = None,
     ):
         if workspace is None:
-            ws_env = os.environ.get("FINDERS_WORKSPACE")
-            workspace = Path(ws_env).expanduser() if ws_env else Path.home() / ".finders" / "workspace"
-        self.workspace = Path(workspace).expanduser().resolve()
+            ws_env = os.path.expanduser(os.getenv("FINDERS_WORKSPACE"))
+            workspace = Path(ws_env).resolve() if ws_env else Path.home() / ".finders" / "workspace"
+        self.workspace = Path(workspace).resolve()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
-        self.user_skill_dir = Path(user_skill_dir).expanduser().resolve() if user_skill_dir else None
-        self.project_skill_dir = Path(project_skill_dir).expanduser().resolve() if project_skill_dir else None
+        self.user_skill_dir = Path(os.path.expanduser(user_skill_dir)).resolve() if user_skill_dir else None
+        self.project_skill_dir = Path(os.path.expanduser(project_skill_dir)).resolve() if project_skill_dir else None
 
         # Build list of allowed write roots
         self._allowed_write_roots: list[Path] = [self.workspace]

@@ -1,7 +1,7 @@
 [project]
 name = "finders"
 version = "0.1.0"
-description = "Financial Deep Research agent"
+description = "Deep Financial Research agent"
 requires-python = ">=3.11"
 dependencies = [
     "langchain>=1.0",
@@ -34,8 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-finders = "finders.cli.main:main"
-finders-serve = "finders.cli.main:serve"
+finders = "finders.cli.main:cli"
 
 [build-system]
 requires = ["setuptools>=68.0"]

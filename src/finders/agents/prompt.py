@@ -79,7 +79,8 @@ When tackling a complex question, follow this structured approach:
 
 - **Task delegation (PRIMARY)**: Use `task_tool` as your primary tool for complex research. Launch multiple subagents in parallel for independent sub-tasks.
 - **Search first, fetch second**: When you must perform direct research (simple cases only), use `web_search` to find relevant URLs, then `web_fetch` to read specific pages
-- **Parallel execution**: When possible, execute independent tool calls or subagents concurrently
+- **Avoid redundant search**: For simple or factual questions, ONE `web_search` is usually enough. Do NOT call `web_search` again with a similar or reworded query unless the first result was clearly unrelated or plainly failed to address the question. Prefer to answer directly from the first result rather than re-searching.
+- **Parallel execution**: When multiple tool calls have NO dependency between them, emit them together as multiple `tool_calls` in a SINGLE assistant turn (parallel invocation) instead of invoking and waiting one by one. Only execute tools sequentially when a later tool truly depends on an earlier tool's output.
 - **Iterative refinement**: Use subagent results to refine follow-up delegation
 - **Local file access**: Use `read_file`, `list_dir`, `glob`, and `grep` to work with files under `/workspace` (writable working directory), `/user_skill` (user-level skills) and `/proj_skill` (project-level skills). Always reference these virtual paths — never use raw local filesystem paths.
 - **Memory recall**: Use `memory_search` to search past research and context (when memory is enabled)

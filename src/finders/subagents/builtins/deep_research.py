@@ -39,6 +39,6 @@ Do NOT use for simple factual lookups that a single search can answer.""",
     tools=None,  # Inherit all tools from parent
     disallowed_tools=["task"],  # Prevent nesting
     model="inherit",
-    max_turns=50,
+    max_turns=1000,
     max_calls_per_tool=50,
 )
